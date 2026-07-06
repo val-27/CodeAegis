@@ -1,0 +1,10 @@
+/Users/jpvalentine/Workspace/agentguard-mcp/target/debug/deps/tagptr-0b2ba5ae474ad2e7.d: /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/lib.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/macros.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/macros/doc.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/atomic.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/non_null.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/ptr.rs
+
+/Users/jpvalentine/Workspace/agentguard-mcp/target/debug/deps/libtagptr-0b2ba5ae474ad2e7.rmeta: /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/lib.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/macros.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/macros/doc.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/atomic.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/non_null.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/ptr.rs
+
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/lib.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/macros.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/macros/doc.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/atomic.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/non_null.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tagptr-0.2.0/src/imp/ptr.rs:

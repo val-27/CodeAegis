@@ -1,0 +1,38 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH codeaegis 1  "codeaegis " 
+.SH NAME
+codeaegis \- CodeAegis Security Scanner & MCP Server
+.SH SYNOPSIS
+\fBcodeaegis\fR [\fB\-\-logs\fR] [\fB\-m\fR|\fB\-\-model\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIsubcommands\fR]
+.SH DESCRIPTION
+CodeAegis Security Scanner & MCP Server
+.SH OPTIONS
+.TP
+\fB\-\-logs\fR
+Enable quality logging for scan results and critic decisions
+.TP
+\fB\-m\fR, \fB\-\-model\fR \fI<MODEL>\fR
+Override the LLM model to use
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.SH SUBCOMMANDS
+.TP
+codeaegis\-mcp(1)
+Runs the CodeAegis MCP Server
+.TP
+codeaegis\-watch(1)
+Monitors a directory for file changes and scans them automatically
+.TP
+codeaegis\-lsp(1)
+Runs the CodeAegis Language Server (LSP)
+.TP
+codeaegis\-scan(1)
+Scans a directory for vulnerabilities
+.TP
+codeaegis\-auth(1)
+Manage LLM authentication credentials in the OS keychain
+.TP
+codeaegis\-help(1)
+Print this message or the help of the given subcommand(s)

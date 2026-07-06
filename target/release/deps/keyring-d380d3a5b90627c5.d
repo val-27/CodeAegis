@@ -1,0 +1,11 @@
+/Users/jpvalentine/Workspace/codeaegis/target/release/deps/keyring-d380d3a5b90627c5.d: /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/lib.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/mock.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/macos.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/credential.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/error.rs
+
+/Users/jpvalentine/Workspace/codeaegis/target/release/deps/libkeyring-d380d3a5b90627c5.rlib: /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/lib.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/mock.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/macos.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/credential.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/error.rs
+
+/Users/jpvalentine/Workspace/codeaegis/target/release/deps/libkeyring-d380d3a5b90627c5.rmeta: /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/lib.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/mock.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/macos.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/credential.rs /Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/error.rs
+
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/lib.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/mock.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/macos.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/credential.rs:
+/Users/jpvalentine/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/keyring-2.3.3/src/error.rs:
