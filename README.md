@@ -24,6 +24,20 @@ CodeAegis acts as a "Security Sidecar" for your AI agent. It provides multiple i
 - **Agentic CRITIC Layer:** Uses a localized LLM "Judge" to analyze raw tool output, prune false positives, and assign a normalized risk tier (Critical, High, Medium, Low, None).
 - **High Performance:** Built in Rust with an async Tokio runtime and in-memory caching.
 
+## Installation
+
+You can install the pre-compiled CodeAegis binary directly using `curl`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/codeaegis/codeaegis/main/install.sh | sh
+```
+
+Or build it from source using Cargo:
+
+```bash
+cargo install --path .
+```
+
 ## Configuration
 
 CodeAegis is configured via environment variables. The "Critic" layer requires an LLM provider to adjudicate scanner results. The provider is **automatically inferred** based on the model name.
