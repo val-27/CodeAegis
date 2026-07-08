@@ -1,6 +1,6 @@
 # Third-Party Credits & Licenses
 
-CodeAegis MCP orchestrates several industry-standard security tools. This project is a harness that invokes these tools externally and does not modify their source code.
+CodeAegis orchestrates several industry-standard security tools. This project is a harness that invokes these tools externally and does not modify their source code.
 
 ## Core Security Scanners
 
@@ -32,4 +32,4 @@ This project also utilizes the following major open-source libraries:
 
 ---
 
-*Note: CodeAegis MCP is distributed under the MIT License. Use of the third-party scanners listed above is subject to their respective licenses. Users are responsible for installing and maintaining these tools locally.*
+*Note: CodeAegis is distributed under the MIT License. Use of the third-party scanners listed above is subject to their respective licenses. Users are responsible for installing and maintaining these tools locally.*

@@ -58,6 +58,7 @@ impl Default for CriticConfig {
 pub struct Critic {
     config: CriticConfig,
     client: reqwest::Client,
+    enabled: bool,
 }
 
 impl Critic {
@@ -91,8 +92,6 @@ impl Critic {
         }
 
         let provider = config.infer_provider();
-        
-        tracing::info!("Using Critic Model: {} (Provider: {})", config.model, provider);
 
         // Fallback to keychain if API key is missing and wasn't already loaded
         if config.api_key.is_none() && provider != CriticProvider::Ollama {
@@ -101,31 +100,29 @@ impl Critic {
             }
         }
 
+        let enabled = if provider == CriticProvider::Ollama {
+            true
+        } else {
+            config.api_key.is_some()
+        };
+
+        if enabled {
+            tracing::info!("Using Critic Model: {} (Provider: {})", config.model, provider);
+        } else {
+            tracing::warn!("Critic LLM API key is missing for provider '{}'. Skipping critic validation phase (running in static-only mode).", provider);
+        }
+
         let critic = Self {
             config,
             client: reqwest::Client::new(),
+            enabled,
         };
-
-        critic.validate(provider)?;
 
         Ok(critic)
     }
 
-    fn validate(&self, provider: CriticProvider) -> Result<()> {
-        match provider {
-            CriticProvider::Ollama => {
-                // Ollama usually doesn't need an API key
-            }
-            _ => {
-                if self.config.api_key.is_none() {
-                    return Err(anyhow!(
-                        "CODEAEGIS_API_KEY is required for provider '{}' (inferred from model '{}'). Please set it in your environment or use 'codeaegis auth login {}'.",
-                        provider, self.config.model, provider
-                    ));
-                }
-            }
-        }
-        Ok(())
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
     }
 
     pub async fn judge(&self, hash: String, code: &str, findings: Vec<Finding>, file_path: Option<&str>) -> Result<ScanResult> {
