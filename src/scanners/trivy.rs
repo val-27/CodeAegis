@@ -89,6 +89,7 @@ fn parse_trivy_output(stdout: &[u8]) -> Result<Vec<Finding>> {
                         severity: m["Severity"].as_str().unwrap_or("UNKNOWN").to_string(),
                         message: m["Message"].as_str().unwrap_or("No message").to_string(),
                         location: Some(format!("{}:{}", m["ID"].as_str().unwrap_or(""), m["Title"].as_str().unwrap_or(""))),
+                        remediation: None,
                     });
                 }
             }

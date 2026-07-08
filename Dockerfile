@@ -33,7 +33,7 @@ COPY --from=builder /usr/src/codeaegis/target/release/codeaegis /usr/local/bin/c
 # Set execution environment
 ENV PATH="/usr/local/bin:${PATH}"
 
-# MCP runs over stdio, so no EXPOSE is needed by default
+# CodeAegis runs over stdio (LSP) or CLI, so no EXPOSE is needed by default
 # unless you bridge it to a port.
 
 ENTRYPOINT ["codeaegis"]

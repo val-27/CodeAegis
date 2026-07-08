@@ -2,11 +2,11 @@
 .el .ds Aq '
 .TH codeaegis 1  "codeaegis " 
 .SH NAME
-codeaegis \- CodeAegis Security Scanner & MCP Server
+codeaegis \- CodeAegis Local Security Scanner & Workspace Agent Skill
 .SH SYNOPSIS
-\fBcodeaegis\fR [\fB\-\-logs\fR] [\fB\-m\fR|\fB\-\-model\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIsubcommands\fR]
+\fBcodeaegis\fR [\fB\-\-logs\fR] [\fB\-m\fR|\fB\-\-model\fR] [\fB\-\-auth\fR] [\fB\-\-scanners\fR] [\fB\-\-skip\-scanners\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIsubcommands\fR]
 .SH DESCRIPTION
-CodeAegis Security Scanner & MCP Server
+CodeAegis Local Security Scanner & Workspace Agent Skill
 .SH OPTIONS
 .TP
 \fB\-\-logs\fR
@@ -15,18 +15,39 @@ Enable quality logging for scan results and critic decisions
 \fB\-m\fR, \fB\-\-model\fR \fI<MODEL>\fR
 Override the LLM model to use
 .TP
+\fB\-\-auth\fR
+Setup LLM authorization or view current LLM config info
+.TP
+\fB\-\-scanners\fR \fI<SCANNERS>\fR
+Comma\-separated list of security scanners to enable (trufflehog, osv, trivy, opengrep). If omitted, all are enabled
+.TP
+\fB\-\-skip\-scanners\fR \fI<SKIP_SCANNERS>\fR
+Comma\-separated list of security scanners to disable
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
 .SH SUBCOMMANDS
 .TP
-codeaegis\-mcp(1)
-Runs the CodeAegis MCP Server
+codeaegis\-watch(1)
+Monitors a directory for file changes and scans them automatically
+.TP
+codeaegis\-init(1)
+Setup a Workspace Agent Skill for CodeAegis in a directory
+.TP
+codeaegis\-lsp(1)
+Runs the CodeAegis Language Server (LSP)
 .TP
 codeaegis\-scan(1)
-Scans a directory for vulnerabilities
+Scans a directory or file for vulnerabilities
 .TP
 codeaegis\-auth(1)
 Manage LLM authentication credentials in the OS keychain
+.TP
+codeaegis\-exclude(1)
+Exclude a file or directory pattern from scans
+.TP
+codeaegis\-setup(1)
+Interactive configuration wizard to set up credentials, exclusions, and skills
 .TP
 codeaegis\-help(1)
 Print this message or the help of the given subcommand(s)

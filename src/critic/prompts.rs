@@ -82,7 +82,8 @@ Response Format:
        "tool": "...",
        "severity": "...",
        "message": "...",
-       "location": "..."
+       "location": "...",
+       "remediation": "Provide detailed, step-by-step instructions or code examples on how to fix this specific vulnerability in the context of the rest of the source file."
     }
   ]
 }
