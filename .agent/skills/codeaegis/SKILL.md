@@ -9,7 +9,7 @@ This skill allows you to run real-time security verification on code changes usi
 
 ## Triggering
 
-This skill is automatically activated when you write or modify code files (such as Rust, Python, JavaScript, Dockerfiles, Terraform, etc.). You should use the `codeaegis` binary to scan any code you produce.
+This skill is automatically activated when you write or modify code files (such as Rust, Python, JavaScript, Terraform, etc.). You should use the `codeaegis` binary to scan any code you produce.
 
 ## Commands and Usage
 

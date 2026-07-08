@@ -65,7 +65,7 @@ pub fn get_rules_for_file(path: &str) -> String {
         rules.push_str(INJECTION_API_RULES);
     }
 
-    if path.ends_with(".tf") || path.ends_with(".yaml") || path.ends_with(".yml") || path.contains("dockerfile") || path.contains("terraform") {
+    if path.ends_with(".tf") || path.ends_with(".yaml") || path.ends_with(".yml") || path.contains("terraform") {
         rules.push_str(IAC_CLOUD_RULES);
     }
 

@@ -42,7 +42,6 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
 fn is_iac_file(path: &str) -> bool {
     let path = path.to_lowercase();
     path.ends_with(".yml") || path.ends_with(".yaml") || path.ends_with(".json") ||
-    path.ends_with("dockerfile") || path.ends_with("containerfile") ||
     path.ends_with(".tf") || path.ends_with(".tf.json") || path.ends_with(".tfvars") ||
     path.ends_with("tfplan") || path.ends_with(".tfplan") ||
     path.ends_with(".tpl") || path.ends_with(".tar.gz") ||

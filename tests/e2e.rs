@@ -200,7 +200,7 @@ fn test_cli_persistent_cache() {
     // Scan a file to populate cache
     let output = Command::new(&bin_path)
         .arg("scan")
-        .arg("example_code/Dockerfile")
+        .arg("example_code/clean.py")
         .output()
         .unwrap();
 
