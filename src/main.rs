@@ -42,8 +42,8 @@ async fn main() -> Result<()> {
     }
 
     // If it's an init command, we handle it before initializing the engine
-    if let Some(Commands::Init { dir }) = &cli.command {
-        cli::handle_init(dir)?;
+    if let Some(Commands::Init { dir, no_hooks }) = &cli.command {
+        cli::handle_init(dir, *no_hooks)?;
         return Ok(());
     }
 

@@ -363,3 +363,93 @@ fn test_cli_report_formats() {
     let _ = fs::remove_file(&rep_csv);
     let _ = fs::remove_file(&rep_html);
 }
+
+#[test]
+fn test_cli_init_with_hooks() {
+    let bin_path = PathBuf::from(env!("CARGO_BIN_EXE_codeaegis"));
+    let target_path = std::env::temp_dir().join(format!("codeaegis-test-hooks-{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(&target_path).expect("Failed to create temp dir");
+
+    // Initialize mock git repo
+    let git_init_status = Command::new("git")
+        .arg("init")
+        .arg(&target_path)
+        .status()
+        .expect("Failed to run git init");
+    assert!(git_init_status.success());
+
+    let output = Command::new(&bin_path)
+        .arg("init")
+        .arg(&target_path)
+        .output()
+        .expect("Failed to execute codeaegis init");
+
+    assert!(output.status.success());
+    
+    let skill_md_path = target_path.join(".agent/skills/codeaegis/SKILL.md");
+    assert!(skill_md_path.exists());
+    
+    let hook_path = target_path.join(".git/hooks/pre-commit");
+    assert!(hook_path.exists());
+    
+    let hook_content = fs::read_to_string(&hook_path).unwrap();
+    assert!(hook_content.contains("CodeAegis Pre-Commit Security Guard"));
+
+    let _ = fs::remove_dir_all(target_path);
+}
+
+#[test]
+fn test_cli_init_no_hooks() {
+    let bin_path = PathBuf::from(env!("CARGO_BIN_EXE_codeaegis"));
+    let target_path = std::env::temp_dir().join(format!("codeaegis-test-nohooks-{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(&target_path).expect("Failed to create temp dir");
+
+    // Initialize mock git repo
+    let git_init_status = Command::new("git")
+        .arg("init")
+        .arg(&target_path)
+        .status()
+        .expect("Failed to run git init");
+    assert!(git_init_status.success());
+
+    let output = Command::new(&bin_path)
+        .arg("init")
+        .arg(&target_path)
+        .arg("--no-hooks")
+        .output()
+        .expect("Failed to execute codeaegis init --no-hooks");
+
+    assert!(output.status.success());
+    
+    let skill_md_path = target_path.join(".agent/skills/codeaegis/SKILL.md");
+    assert!(skill_md_path.exists());
+    
+    let hook_path = target_path.join(".git/hooks/pre-commit");
+    assert!(!hook_path.exists());
+
+    let _ = fs::remove_dir_all(target_path);
+}
+
+#[test]
+fn test_cli_init_no_git() {
+    let bin_path = PathBuf::from(env!("CARGO_BIN_EXE_codeaegis"));
+    let target_path = std::env::temp_dir().join(format!("codeaegis-test-nogit-{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(&target_path).expect("Failed to create temp dir");
+
+    // Run init without .git folder present
+    let output = Command::new(&bin_path)
+        .arg("init")
+        .arg(&target_path)
+        .output()
+        .expect("Failed to execute codeaegis init");
+
+    assert!(output.status.success());
+    
+    let skill_md_path = target_path.join(".agent/skills/codeaegis/SKILL.md");
+    assert!(skill_md_path.exists());
+    
+    let hook_path = target_path.join(".git/hooks/pre-commit");
+    assert!(!hook_path.exists());
+
+    let _ = fs::remove_dir_all(target_path);
+}

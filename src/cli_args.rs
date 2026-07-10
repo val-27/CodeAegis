@@ -46,6 +46,10 @@ pub enum Commands {
         /// The target directory to install the skill in
         #[arg(default_value = ".")]
         dir: PathBuf,
+
+        /// Skip git pre-commit hook installation
+        #[arg(long, default_value_t = false)]
+        no_hooks: bool,
     },
     /// Runs the CodeAegis Language Server (LSP)
     Lsp,
