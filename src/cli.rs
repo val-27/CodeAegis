@@ -661,6 +661,28 @@ codeaegis scan . --report report.sarif
 
     println!("Initialized Workspace Agent Skill for CodeAegis at: {}", skill_file_path.display());
 
+    // Create rules directory and security.md file
+    let rules_dir = dir.join(".agent/rules");
+    std::fs::create_dir_all(&rules_dir)
+        .context(format!("Failed to create rules directory: {}", rules_dir.display()))?;
+
+    let security_file_path = rules_dir.join("security.md");
+    let security_content = r#"# CodeAegis Security Verification Rule
+
+This repository uses **CodeAegis** to ensure code changes are secure, free of secrets, dependency vulnerabilities, and insecure configurations.
+
+## Instructions for AI Agents:
+1. Whenever you modify or write code in this repository, you **MUST** run the local `codeaegis scan` CLI command to check your changes.
+2. Do not commit or present code with high or critical vulnerabilities to the user.
+3. Review the findings and their context-aware remediation hints to resolve any issues.
+4. You can find detailed usage and CLI options in the Workspace Agent Skill definition at `.agent/skills/codeaegis/SKILL.md`.
+"#;
+
+    std::fs::write(&security_file_path, security_content)
+        .context(format!("Failed to write security.md to {}", security_file_path.display()))?;
+
+    println!("Initialized Agent Security Rule at: {}", security_file_path.display());
+
     if !no_hooks {
         let git_dir = dir.join(".git");
         if git_dir.exists() && git_dir.is_dir() {

@@ -38,6 +38,11 @@ fn test_cli_init() {
     assert!(content.contains("name: codeaegis"));
     assert!(content.contains("CodeAegis Security Scanner Skill"));
 
+    let security_md_path = target_path.join(".agent/rules/security.md");
+    assert!(security_md_path.exists());
+    let sec_content = fs::read_to_string(&security_md_path).expect("Failed to read security.md");
+    assert!(sec_content.contains("CodeAegis Security Verification Rule"));
+
     let _ = fs::remove_dir_all(target_path);
 }
 
