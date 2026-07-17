@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use crate::cache::Finding;
 use serde_json::json;
+use std::time::Duration;
 
 pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
     let file_name = file_path.unwrap_or("");
@@ -44,7 +45,9 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
         return Ok(vec![]);
     }
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
     let payload = json!({ "queries": queries });
 
     let response = client.post("https://api.osv.dev/v1/querybatch")
@@ -74,7 +77,10 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
                         let client_clone = client.clone();
                         
                         detail_futures.push(tokio::spawn(async move {
-                            fetch_vuln_details(&client_clone, id, dep_name, dep_version).await
+                            let fallback = fallback_finding(&id, &dep_name, &dep_version);
+                            fetch_vuln_details(&client_clone, id, dep_name, dep_version)
+                                .await
+                                .unwrap_or(fallback)
                         }));
                     }
                 }
@@ -83,7 +89,7 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
     }
 
     for fut in detail_futures {
-        if let Ok(Ok(finding)) = fut.await {
+        if let Ok(finding) = fut.await {
             findings.push(finding);
         }
     }
@@ -95,13 +101,7 @@ async fn fetch_vuln_details(client: &reqwest::Client, id: String, dep_name: Stri
     let url = format!("https://api.osv.dev/v1/vulns/{}", id);
     let response = client.get(&url).send().await?;
     if !response.status().is_success() {
-        return Ok(Finding {
-            tool: "OSV".to_string(),
-            severity: "HIGH".to_string(),
-            message: format!("Vulnerability {} found in package {}=={}", id, dep_name, dep_version),
-            location: Some(format!("requirements.txt:{}", dep_name)),
-            remediation: None,
-        });
+        return Ok(fallback_finding(&id, &dep_name, &dep_version));
     }
 
     let val: serde_json::Value = response.json().await?;
@@ -153,4 +153,14 @@ async fn fetch_vuln_details(client: &reqwest::Client, id: String, dep_name: Stri
         location: Some(format!("requirements.txt:{}", dep_name)),
         remediation,
     })
+}
+
+fn fallback_finding(id: &str, dep_name: &str, dep_version: &str) -> Finding {
+    Finding {
+        tool: "OSV".to_string(),
+        severity: "HIGH".to_string(),
+        message: format!("Vulnerability {} found in package {}=={}", id, dep_name, dep_version),
+        location: Some(format!("requirements.txt:{}", dep_name)),
+        remediation: None,
+    }
 }

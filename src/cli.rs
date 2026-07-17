@@ -617,13 +617,6 @@ pub fn generate_report(results: &[(String, ScanResult)], path: &Path, format_opt
 }
 
 pub fn handle_init(dir: &Path, no_hooks: bool) -> Result<()> {
-    if !are_binaries_installed() {
-        println!("🔍 Detecting missing security scanner binaries...");
-        if let Err(e) = install_binaries() {
-            println!("⚠️ Warning: Failed to automatically install scanner binaries: {}", e);
-        }
-    }
-
     let skill_dir = dir.join(".agent/skills/codeaegis");
     std::fs::create_dir_all(&skill_dir)
         .context(format!("Failed to create skill directory: {}", skill_dir.display()))?;
@@ -647,14 +640,14 @@ This skill is automatically activated when you write or modify code files (such 
 
 You can run the following shell commands in the project directory:
 
-### 1. Scan a specific file or directory
+### 1. Scan specific files or directories
 ```bash
-codeaegis scan <PATH>
+codeaegis scan <PATHS>...
 ```
 
 Example:
 ```bash
-codeaegis scan ./src/main.rs
+codeaegis scan ./src/main.rs ./Cargo.toml
 ```
 
 ### 2. Scan the entire workspace
@@ -666,6 +659,11 @@ codeaegis scan .
 To generate a SARIF report of findings:
 ```bash
 codeaegis scan . --report report.sarif
+```
+
+### 4. Scan without using cached results
+```bash
+codeaegis scan . --skip-cache
 ```
 
 ## How to Handle Scan Results
@@ -829,6 +827,7 @@ pub fn handle_setup() -> Result<()> {
 
 pub fn install_binaries() -> Result<()> {
     use std::io::Write;
+    use std::process::{Command, Stdio};
     
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let bin_dir = std::path::PathBuf::from(&home).join(".cargo/bin");
@@ -839,73 +838,79 @@ pub fn install_binaries() -> Result<()> {
 
     println!("\n📥 Installing external security scanners to {}...", bin_dir.display());
 
+    let run_installer = |url: &str| -> Result<bool> {
+        let mut curl = Command::new("curl")
+            .args(["-sSfL", url])
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        let curl_stdout = curl
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("failed to capture curl output"))?;
+
+        let mut installer = Command::new("sh")
+            .args(["-s", "--", "-b"])
+            .arg(&bin_dir)
+            .stdin(Stdio::from(curl_stdout))
+            .spawn()?;
+
+        let installer_status = installer.wait()?;
+        let curl_status = curl.wait()?;
+
+        Ok(curl_status.success() && installer_status.success())
+    };
+
     // 1. Install TruffleHog
     print!("  Installing TruffleHog... ");
     std::io::stdout().flush()?;
-    let truffle_status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(format!(
-            "curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b {}",
-            bin_dir.display()
-        ))
-        .status();
-    match truffle_status {
-        Ok(status) if status.success() => println!("✅ Done"),
+    match run_installer("https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh") {
+        Ok(true) => println!("✅ Done"),
         _ => println!("❌ Failed (skipping)"),
     }
 
     // 2. Install Trivy
     print!("  Installing Trivy... ");
     std::io::stdout().flush()?;
-    let trivy_status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(format!(
-            "curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b {}",
-            bin_dir.display()
-        ))
-        .status();
-    match trivy_status {
-        Ok(status) if status.success() => println!("✅ Done"),
+    match run_installer("https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh") {
+        Ok(true) => println!("✅ Done"),
         _ => println!("❌ Failed (skipping)"),
     }
 
     // 3. Install Opengrep
     print!("  Installing Opengrep... ");
     std::io::stdout().flush()?;
-    let arch = if cfg!(target_arch = "aarch64") {
-        "arm64"
-    } else {
-        "x86"
+    let arch = match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("macos", "aarch64") => Some("arm64"),
+        ("macos", "x86_64") => Some("x86"),
+        _ => None,
     };
-    let opengrep_status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(format!(
-            "curl -sSfL -o {} https://github.com/opengrep/opengrep/releases/download/v1.25.0/opengrep_osx_{} && chmod +x {}",
-            bin_dir.join("opengrep").display(),
-            arch,
-            bin_dir.join("opengrep").display()
-        ))
-        .status();
-    match opengrep_status {
-        Ok(status) if status.success() => println!("✅ Done"),
-        _ => println!("❌ Failed (skipping)"),
+    if let Some(arch) = arch {
+        let opengrep_path = bin_dir.join("opengrep");
+        let opengrep_url = format!(
+            "https://github.com/opengrep/opengrep/releases/download/v1.25.0/opengrep_osx_{}",
+            arch
+        );
+        let curl_status = Command::new("curl")
+            .args(["-sSfL", "-o"])
+            .arg(&opengrep_path)
+            .arg(&opengrep_url)
+            .status();
+
+        let chmod_status = curl_status
+            .ok()
+            .filter(|status| status.success())
+            .map(|_| Command::new("chmod").arg("+x").arg(&opengrep_path).status());
+
+        match chmod_status {
+            Some(Ok(status)) if status.success() => println!("✅ Done"),
+            _ => println!("❌ Failed (skipping)"),
+        }
+    } else {
+        println!("❌ Unsupported platform (skipping)");
     }
 
     Ok(())
-}
-
-pub fn are_binaries_installed() -> bool {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let bin_dir = std::path::PathBuf::from(&home).join(".cargo/bin");
-    
-    let truffle_ok = std::process::Command::new("trufflehog").arg("--version").output().is_ok() 
-        || bin_dir.join("trufflehog").exists();
-    let trivy_ok = std::process::Command::new("trivy").arg("--version").output().is_ok()
-        || bin_dir.join("trivy").exists();
-    let opengrep_ok = std::process::Command::new("opengrep").arg("--version").output().is_ok()
-        || bin_dir.join("opengrep").exists();
-        
-    truffle_ok && trivy_ok && opengrep_ok
 }
 
 fn get_hooks_dir(dir: &Path) -> Option<PathBuf> {
@@ -924,13 +929,7 @@ fn get_hooks_dir(dir: &Path) -> Option<PathBuf> {
                         }
                         
                         if gitdir_path.contains("worktrees") {
-                            if let Some(parent) = gitdir.parent() {
-                                if let Some(grandparent) = parent.parent() {
-                                    if grandparent.is_dir() {
-                                        return Some(grandparent.join("hooks"));
-                                    }
-                                }
-                            }
+                            return None;
                         } else {
                             // Submodule or other case - use gitdir/hooks directly
                             if gitdir.is_dir() {
