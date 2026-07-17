@@ -8,23 +8,36 @@ use serde_json::json;
 
 pub async fn run_directory_scan(
     engine: Arc<ScanEngine>,
-    dir: PathBuf,
+    paths: Vec<PathBuf>,
     report_path: Option<PathBuf>,
     recursive: bool,
     no_fail: bool,
     severity_threshold: String,
     format: String,
     report_format: Option<String>,
+    skip_cache: bool,
 ) -> Result<()> {
     let is_json = format == "json";
     
     if !is_json {
-        println!("Scanning directory: {} (recursive: {})", dir.display(), recursive);
+        if paths.len() == 1 {
+            println!("Scanning path: {} (recursive: {})", paths[0].display(), recursive);
+        } else {
+            println!("Scanning {} paths (recursive: {})", paths.len(), recursive);
+        }
     }
 
     let mut results = Vec::new();
 
-    let mut builder = WalkBuilder::new(&dir);
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    let mut builder = WalkBuilder::new(&paths[0]);
+    for path in &paths[1..] {
+        builder.add(path);
+    }
+
     builder.hidden(true);
     builder.git_ignore(true);
     builder.filter_entry(|entry| {
@@ -59,12 +72,12 @@ pub async fn run_directory_scan(
                 Err(_) => continue, // Skip files we can't read as UTF-8
             };
 
-            let rel_path = path.strip_prefix(&dir).unwrap_or(path).to_string_lossy();
+            let rel_path = path.strip_prefix(".").unwrap_or(path).to_string_lossy();
             
             if !is_json {
                 print!("  Scanning {}... ", rel_path);
             }
-            match engine.scan(&code, Some(&rel_path)).await {
+            match engine.scan(&code, Some(&rel_path), skip_cache).await {
                 Ok(scan_res) => {
                     if !is_json {
                         if scan_res.summary == "Skipped (Excluded by configuration)" {
@@ -88,7 +101,8 @@ pub async fn run_directory_scan(
 
     if is_json {
         let json_output = json!({
-            "scanned_directory": dir.to_string_lossy(),
+            "scanned_directory": paths.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>().join(", "),
+            "scanned_paths": paths.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>(),
             "findings_count": results.len(),
             "results": results.iter().map(|(path, res)| {
                 json!({
@@ -603,6 +617,13 @@ pub fn generate_report(results: &[(String, ScanResult)], path: &Path, format_opt
 }
 
 pub fn handle_init(dir: &Path, no_hooks: bool) -> Result<()> {
+    if !are_binaries_installed() {
+        println!("🔍 Detecting missing security scanner binaries...");
+        if let Err(e) = install_binaries() {
+            println!("⚠️ Warning: Failed to automatically install scanner binaries: {}", e);
+        }
+    }
+
     let skill_dir = dir.join(".agent/skills/codeaegis");
     std::fs::create_dir_all(&skill_dir)
         .context(format!("Failed to create skill directory: {}", skill_dir.display()))?;
@@ -684,9 +705,7 @@ This repository uses **CodeAegis** to ensure code changes are secure, free of se
     println!("Initialized Agent Security Rule at: {}", security_file_path.display());
 
     if !no_hooks {
-        let git_dir = dir.join(".git");
-        if git_dir.exists() && git_dir.is_dir() {
-            let hooks_dir = git_dir.join("hooks");
+        if let Some(hooks_dir) = get_hooks_dir(dir) {
             if !hooks_dir.exists() {
                 std::fs::create_dir_all(&hooks_dir)
                     .context(format!("Failed to create git hooks directory: {}", hooks_dir.display()))?;
@@ -737,7 +756,7 @@ exit 0
 
             println!("Git pre-commit hook installed at: {}", hook_path.display());
         } else {
-            println!("⚠️ No .git directory found. Skipping Git pre-commit hook setup.");
+            println!("⚠️ No .git directory/file found. Skipping Git pre-commit hook setup.");
         }
     }
 
@@ -789,11 +808,143 @@ pub fn handle_setup() -> Result<()> {
         handle_init(&PathBuf::from("."), false)?;
     }
 
-    // 4. Print Status
+    // 4. External Scanner Binaries Download
+    print!("\n📥 Would you like to check for and install missing security scanner binaries (TruffleHog, Trivy, Opengrep)? [Y/n]: ");
+    io::stdout().flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let input = input.trim().to_lowercase();
+    if input.is_empty() || input == "y" {
+        install_binaries()?;
+    }
+
+    // 5. Print Status
     println!("\n\x1b[1;32m==================================================\x1b[0m");
     println!("\x1b[1;32m✅ CodeAegis Setup Complete!\x1b[0m");
     println!("\x1b[1;32m==================================================\x1b[0m");
     crate::auth::handle_status()?;
 
     Ok(())
+}
+
+pub fn install_binaries() -> Result<()> {
+    use std::io::Write;
+    
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let bin_dir = std::path::PathBuf::from(&home).join(".cargo/bin");
+    
+    if !bin_dir.exists() {
+        std::fs::create_dir_all(&bin_dir)?;
+    }
+
+    println!("\n📥 Installing external security scanners to {}...", bin_dir.display());
+
+    // 1. Install TruffleHog
+    print!("  Installing TruffleHog... ");
+    std::io::stdout().flush()?;
+    let truffle_status = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b {}",
+            bin_dir.display()
+        ))
+        .status();
+    match truffle_status {
+        Ok(status) if status.success() => println!("✅ Done"),
+        _ => println!("❌ Failed (skipping)"),
+    }
+
+    // 2. Install Trivy
+    print!("  Installing Trivy... ");
+    std::io::stdout().flush()?;
+    let trivy_status = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b {}",
+            bin_dir.display()
+        ))
+        .status();
+    match trivy_status {
+        Ok(status) if status.success() => println!("✅ Done"),
+        _ => println!("❌ Failed (skipping)"),
+    }
+
+    // 3. Install Opengrep
+    print!("  Installing Opengrep... ");
+    std::io::stdout().flush()?;
+    let arch = if cfg!(target_arch = "aarch64") {
+        "arm64"
+    } else {
+        "x86"
+    };
+    let opengrep_status = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "curl -sSfL -o {} https://github.com/opengrep/opengrep/releases/download/v1.25.0/opengrep_osx_{} && chmod +x {}",
+            bin_dir.join("opengrep").display(),
+            arch,
+            bin_dir.join("opengrep").display()
+        ))
+        .status();
+    match opengrep_status {
+        Ok(status) if status.success() => println!("✅ Done"),
+        _ => println!("❌ Failed (skipping)"),
+    }
+
+    Ok(())
+}
+
+pub fn are_binaries_installed() -> bool {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let bin_dir = std::path::PathBuf::from(&home).join(".cargo/bin");
+    
+    let truffle_ok = std::process::Command::new("trufflehog").arg("--version").output().is_ok() 
+        || bin_dir.join("trufflehog").exists();
+    let trivy_ok = std::process::Command::new("trivy").arg("--version").output().is_ok()
+        || bin_dir.join("trivy").exists();
+    let opengrep_ok = std::process::Command::new("opengrep").arg("--version").output().is_ok()
+        || bin_dir.join("opengrep").exists();
+        
+    truffle_ok && trivy_ok && opengrep_ok
+}
+
+fn get_hooks_dir(dir: &Path) -> Option<PathBuf> {
+    let git_path = dir.join(".git");
+    if git_path.exists() {
+        if git_path.is_dir() {
+            Some(git_path.join("hooks"))
+        } else if git_path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&git_path) {
+                if let Some(line) = content.lines().next() {
+                    if line.starts_with("gitdir:") {
+                        let gitdir_path = line["gitdir:".len()..].trim();
+                        let mut gitdir = PathBuf::from(gitdir_path);
+                        if !gitdir.is_absolute() {
+                            gitdir = dir.join(gitdir);
+                        }
+                        
+                        if gitdir_path.contains("worktrees") {
+                            if let Some(parent) = gitdir.parent() {
+                                if let Some(grandparent) = parent.parent() {
+                                    if grandparent.is_dir() {
+                                        return Some(grandparent.join("hooks"));
+                                    }
+                                }
+                            }
+                        } else {
+                            // Submodule or other case - use gitdir/hooks directly
+                            if gitdir.is_dir() {
+                                return Some(gitdir.join("hooks"));
+                            }
+                        }
+                    }
+                }
+            }
+            None
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }

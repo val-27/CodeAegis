@@ -36,7 +36,7 @@ impl ScanEngine {
         self.enable_logs.store(enabled, std::sync::atomic::Ordering::Relaxed);
     }
 
-    pub async fn scan(&self, code: &str, file_path: Option<&str>) -> Result<ScanResult> {
+    pub async fn scan(&self, code: &str, file_path: Option<&str>, skip_cache: bool) -> Result<ScanResult> {
         let hash = self.compute_hash(code);
 
         // 0. Exclusions Check
@@ -67,8 +67,10 @@ impl ScanEngine {
         }
 
         // 1. Cache Check
-        if let Some(result) = self.cache.get(&hash).await {
-            return Ok(result);
+        if !skip_cache {
+            if let Some(result) = self.cache.get(&hash).await {
+                return Ok(result);
+            }
         }
 
         // 2. Single-Flight Lock

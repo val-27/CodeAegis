@@ -64,7 +64,7 @@ async fn handle_file_event(
     };
 
     let path_str = path.to_string_lossy();
-    let result = engine.scan(&content, Some(&path_str)).await?;
+    let result = engine.scan(&content, Some(&path_str), false).await?;
 
     let has_findings = !result.findings.is_empty();
 

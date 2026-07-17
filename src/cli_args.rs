@@ -55,9 +55,9 @@ pub enum Commands {
     Lsp,
     /// Scans a directory or file for vulnerabilities
     Scan {
-        /// The directory or file to scan
+        /// The directories or files to scan
         #[arg(default_value = ".")]
-        dir: PathBuf,
+        paths: Vec<PathBuf>,
 
         /// Output findings to a SARIF compliant file
         #[arg(long)]
@@ -82,6 +82,10 @@ pub enum Commands {
         /// Explicit report format (sarif, json, junit, markdown, csv, html). If omitted, inferred from report filename.
         #[arg(long)]
         report_format: Option<String>,
+
+        /// Skip reading cache for this scan
+        #[arg(long, default_value_t = false)]
+        skip_cache: bool,
     },
     /// Manage LLM authentication credentials in the OS keychain
     Auth {

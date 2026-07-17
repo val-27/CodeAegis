@@ -18,12 +18,24 @@ use clap::Parser;
 use cli_args::{Cli, Commands, AuthCommands};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     // Initialize tracing to write to stderr so it doesn't break CLI stdout output (e.g. JSON/SARIF reports)
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .init();
 
+    let exit_code = match run_app().await {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+            1
+        }
+    };
+    
+    std::process::exit(exit_code);
+}
+
+async fn run_app() -> Result<()> {
     let cli = Cli::parse();
 
     if cli.auth {
@@ -85,7 +97,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         None => {
-            cli::run_directory_scan(engine, std::path::PathBuf::from("."), None, false, false, "none".to_string(), "text".to_string(), None).await?;
+            cli::run_directory_scan(engine, vec![std::path::PathBuf::from(".")], None, false, false, "none".to_string(), "text".to_string(), None, false).await?;
         }
         Some(Commands::Watch { dir, strict }) => {
             watchdog::run_watchdog(engine, dir, strict).await?;
@@ -93,8 +105,8 @@ async fn main() -> Result<()> {
         Some(Commands::Lsp) => {
             lsp::run_lsp_server(engine).await?;
         }
-        Some(Commands::Scan { dir, report, recursive, no_fail, severity_threshold, format, report_format }) => {
-            cli::run_directory_scan(engine, dir, report, recursive, no_fail, severity_threshold, format, report_format).await?;
+        Some(Commands::Scan { paths, report, recursive, no_fail, severity_threshold, format, report_format, skip_cache }) => {
+            cli::run_directory_scan(engine, paths, report, recursive, no_fail, severity_threshold, format, report_format, skip_cache).await?;
         }
         Some(Commands::Auth { .. }) | Some(Commands::Init { .. }) | Some(Commands::Exclude { .. }) | Some(Commands::Setup) => unreachable!(),
     }

@@ -60,7 +60,7 @@ impl CodeAegisBackend {
     async fn validate_document(&self, uri: Url, content: String) {
         let path_str = uri.to_file_path().ok().map(|p: std::path::PathBuf| p.to_string_lossy().into_owned());
         
-        match self.engine.scan(&content, path_str.as_deref()).await {
+        match self.engine.scan(&content, path_str.as_deref(), false).await {
             Ok(result) => {
                 let mut diagnostics = Vec::new();
                 

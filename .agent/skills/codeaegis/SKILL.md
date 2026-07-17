@@ -15,14 +15,14 @@ This skill is automatically activated when you write or modify code files (such 
 
 You can run the following shell commands in the project directory:
 
-### 1. Scan a specific file or directory
+### 1. Scan specific files or directories
 ```bash
-codeaegis scan <PATH>
+codeaegis scan <PATH>...
 ```
 
 Example:
 ```bash
-codeaegis scan ./src/main.rs
+codeaegis scan ./src/main.rs ./src/cli.rs
 ```
 
 ### 2. Scan the entire workspace
@@ -30,7 +30,13 @@ codeaegis scan ./src/main.rs
 codeaegis scan .
 ```
 
-### 3. Scan and generate a security report
+### 3. Scan ignoring cache
+To force a fresh scan ignoring previous cached results:
+```bash
+codeaegis scan . --skip-cache
+```
+
+### 4. Scan and generate a security report
 To generate a SARIF report of findings:
 ```bash
 codeaegis scan . --report report.sarif
