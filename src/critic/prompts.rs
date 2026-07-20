@@ -54,18 +54,30 @@ GENERAL SECURITY RULES:
 
 pub fn get_rules_for_file(path: &str) -> String {
     let path = path.to_lowercase();
-    
+
     let mut rules = String::from(GENERAL_RULES);
 
-    if path.contains("auth") || path.contains("secret") || path.contains("key") || path.ends_with(".env") {
+    if path.contains("auth")
+        || path.contains("secret")
+        || path.contains("key")
+        || path.ends_with(".env")
+    {
         rules.push_str(AUTH_SECRETS_RULES);
     }
-    
-    if path.contains("api") || path.contains("route") || path.contains("controller") || path.contains("db") {
+
+    if path.contains("api")
+        || path.contains("route")
+        || path.contains("controller")
+        || path.contains("db")
+    {
         rules.push_str(INJECTION_API_RULES);
     }
 
-    if path.ends_with(".tf") || path.ends_with(".yaml") || path.ends_with(".yml") || path.contains("terraform") {
+    if path.ends_with(".tf")
+        || path.ends_with(".yaml")
+        || path.ends_with(".yml")
+        || path.contains("terraform")
+    {
         rules.push_str(IAC_CLOUD_RULES);
     }
 

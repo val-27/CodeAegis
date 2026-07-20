@@ -1,10 +1,10 @@
-use anyhow::{Result, anyhow};
 use crate::cache::Finding;
-use tokio::process::Command;
-use std::time::Duration;
-use tokio::time::timeout;
+use anyhow::{anyhow, Result};
 use std::env;
 use std::path::PathBuf;
+use std::time::Duration;
+use tokio::process::Command;
+use tokio::time::timeout;
 use uuid::Uuid;
 
 pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
@@ -16,7 +16,7 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
 
     let temp_dir = env::temp_dir();
     let temp_file_path = temp_dir.join(format!("codeaegis-{}.{}", Uuid::new_v4(), extension));
-    
+
     tokio::fs::write(&temp_file_path, code).await?;
 
     let result = run_opengrep_scan(&temp_file_path).await;
@@ -66,7 +66,7 @@ fn parse_opengrep_output(stdout: &[u8]) -> Result<Vec<Finding>> {
             let message = extra["message"].as_str().unwrap_or("No message");
             let severity = extra["severity"].as_str().unwrap_or("WARNING");
             let line = r["start"]["line"].as_u64().unwrap_or(0);
-            
+
             findings.push(Finding {
                 tool: "Opengrep".to_string(),
                 severity: severity.to_string(),

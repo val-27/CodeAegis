@@ -1,8 +1,8 @@
-use tokio::process::Command;
-use std::time::Duration;
-use tokio::time::timeout;
-use anyhow::{Result, anyhow};
 use crate::cache::Finding;
+use anyhow::{anyhow, Result};
+use std::time::Duration;
+use tokio::process::Command;
+use tokio::time::timeout;
 
 pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
     let mut child = Command::new("trufflehog")
@@ -14,7 +14,10 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
         .stderr(std::process::Stdio::null())
         .spawn()?;
 
-    let mut stdin = child.stdin.take().ok_or_else(|| anyhow!("Failed to open stdin"))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow!("Failed to open stdin"))?;
     tokio::io::AsyncWriteExt::write_all(&mut stdin, code.as_bytes()).await?;
     drop(stdin);
 
@@ -46,9 +49,11 @@ fn parse_trufflehog_output(stdout: &[u8], file_path: Option<&str>) -> Result<Vec
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
             let detector = v["DetectorName"].as_str().unwrap_or("Unknown");
             let verified = v["Verified"].as_bool().unwrap_or(false);
-            
-            let line_num = v["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap_or(0);
-            
+
+            let line_num = v["SourceMetadata"]["Data"]["Filesystem"]["line"]
+                .as_u64()
+                .unwrap_or(0);
+
             let severity = if verified {
                 "CRITICAL".to_string()
             } else {
@@ -68,7 +73,10 @@ fn parse_trufflehog_output(stdout: &[u8], file_path: Option<&str>) -> Result<Vec
                 severity,
                 message,
                 location,
-                remediation: Some("Revoke the exposed credential immediately and remove it from history".to_string()),
+                remediation: Some(
+                    "Revoke the exposed credential immediately and remove it from history"
+                        .to_string(),
+                ),
             });
         }
     }

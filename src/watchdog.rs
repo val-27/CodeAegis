@@ -8,22 +8,29 @@ use std::time::Duration;
 use tokio::fs;
 
 pub async fn run_watchdog(engine: Arc<ScanEngine>, dir: PathBuf, strict: bool) -> Result<()> {
-    tracing::info!("Starting CodeAegis Watchdog on {:?} (strict: {})", dir, strict);
+    tracing::info!(
+        "Starting CodeAegis Watchdog on {:?} (strict: {})",
+        dir,
+        strict
+    );
 
     // Initial clean state cache
     let clean_states = Arc::new(Mutex::new(HashMap::<PathBuf, String>::new()));
-    
+
     // Channel for events from the debouncer
     let (tx, mut rx) = tokio::sync::mpsc::channel::<PathBuf>(100);
 
     // Initialize debouncer with 500ms delay
-    let mut debouncer = new_debouncer(Duration::from_millis(500), move |res: DebounceEventResult| {
-        if let Ok(events) = res {
-            for event in events {
-                let _ = tx.blocking_send(event.path);
+    let mut debouncer = new_debouncer(
+        Duration::from_millis(500),
+        move |res: DebounceEventResult| {
+            if let Ok(events) = res {
+                for event in events {
+                    let _ = tx.blocking_send(event.path);
+                }
             }
-        }
-    })?;
+        },
+    )?;
 
     // Start watching
     debouncer.watcher().watch(&dir, RecursiveMode::Recursive)?;
@@ -70,7 +77,7 @@ async fn handle_file_event(
 
     if has_findings {
         tracing::warn!("⚠️ Vulnerability detected in {:?}", path);
-        
+
         let report = format!(
             "# CodeAegis Security Alert\n\n**File:** `{}`\n**Risk Tier:** {}\n\n## Summary\n{}\n\n## Findings\n{}",
             path_str,
@@ -79,7 +86,10 @@ async fn handle_file_event(
             result.findings.iter().map(|f| format!("- **{}**: {}", f.tool, f.message)).collect::<Vec<_>>().join("\n")
         );
 
-        let alert_path = path.parent().unwrap_or(Path::new(".")).join(".codeaegis-alert.md");
+        let alert_path = path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(".codeaegis-alert.md");
         fs::write(&alert_path, report).await?;
 
         if strict {
@@ -89,19 +99,30 @@ async fn handle_file_event(
             };
 
             if let Some(clean_content) = previous_state {
-                tracing::warn!("🛡️ Strict Mode: Reverting {:?} to last known safe state.", path);
+                tracing::warn!(
+                    "🛡️ Strict Mode: Reverting {:?} to last known safe state.",
+                    path
+                );
                 fs::write(path, clean_content).await?;
             } else {
-                tracing::error!("❌ Strict Mode: No previous safe state found for {:?}. Cannot revert.", path);
+                tracing::error!(
+                    "❌ Strict Mode: No previous safe state found for {:?}. Cannot revert.",
+                    path
+                );
             }
         }
     } else {
         // File is clean, update clean state
-        let mut cache = clean_states.lock().unwrap();
-        cache.insert(path.to_path_buf(), content);
-        
+        {
+            let mut cache = clean_states.lock().unwrap();
+            cache.insert(path.to_path_buf(), content);
+        }
+
         // Remove alert if it exists
-        let alert_path = path.parent().unwrap_or(Path::new(".")).join(".codeaegis-alert.md");
+        let alert_path = path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(".codeaegis-alert.md");
         if alert_path.exists() {
             let _ = fs::remove_file(alert_path).await;
         }

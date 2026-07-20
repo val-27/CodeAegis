@@ -7,7 +7,7 @@ use std::path::PathBuf;
 mod cli_args;
 
 fn main() -> std::io::Result<()> {
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR").ok_or_else(|| std::io::ErrorKind::NotFound)?);
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").ok_or(std::io::ErrorKind::NotFound)?);
     let cmd = cli_args::Cli::command();
 
     let man = clap_mangen::Man::new(cmd);

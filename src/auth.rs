@@ -1,5 +1,5 @@
+use anyhow::{anyhow, Result};
 use keyring::Entry;
-use anyhow::{Result, anyhow};
 use std::io::{self, Write};
 
 pub fn get_keychain_entry(provider: &str) -> Result<Entry> {
@@ -11,16 +11,18 @@ pub fn get_keychain_entry(provider: &str) -> Result<Entry> {
 pub fn handle_login(provider: &str) -> Result<()> {
     print!("🔒 Enter API Key for {}: ", provider);
     io::stdout().flush()?;
-    
+
     let key = rpassword::read_password()?;
-    
+
     if key.trim().is_empty() {
         return Err(anyhow!("API Key cannot be empty"));
     }
 
     let entry = get_keychain_entry(provider)?;
-    entry.set_password(key.trim()).map_err(|e| anyhow!("Failed to save key: {}", e))?;
-    
+    entry
+        .set_password(key.trim())
+        .map_err(|e| anyhow!("Failed to save key: {}", e))?;
+
     println!("✅ Successfully saved {} API key to OS Keychain.", provider);
     Ok(())
 }
@@ -28,8 +30,13 @@ pub fn handle_login(provider: &str) -> Result<()> {
 pub fn handle_logout(provider: &str) -> Result<()> {
     let entry = get_keychain_entry(provider)?;
     match entry.delete_password() {
-        Ok(_) => println!("✅ Successfully removed {} API key from OS Keychain.", provider),
-        Err(keyring::Error::NoEntry) => println!("ℹ️ No key found for {} in the keychain.", provider),
+        Ok(_) => println!(
+            "✅ Successfully removed {} API key from OS Keychain.",
+            provider
+        ),
+        Err(keyring::Error::NoEntry) => {
+            println!("ℹ️ No key found for {} in the keychain.", provider)
+        }
         Err(e) => return Err(anyhow!("Failed to remove key: {}", e)),
     }
     Ok(())
@@ -38,13 +45,13 @@ pub fn handle_logout(provider: &str) -> Result<()> {
 pub fn handle_status() -> Result<()> {
     println!("--- CodeAegis Keychain Status ---");
     let providers = vec!["gemini", "openai", "grok"];
-    
+
     for provider in providers {
         let entry = get_keychain_entry(provider)?;
         match entry.get_password() {
             Ok(key) => {
                 let masked = if key.len() > 8 {
-                    format!("{}...{}", &key[..4], &key[key.len()-4..])
+                    format!("{}...{}", &key[..4], &key[key.len() - 4..])
                 } else {
                     "********".to_string()
                 };
@@ -100,24 +107,32 @@ pub fn handle_auth_flag(model_override: Option<String>) -> Result<()> {
 
     match (&env_key, &keychain_key) {
         (Some(_), _) => {
-            println!("Authorization Status: Configured (via environment variable CODEAEGIS_API_KEY)");
+            println!(
+                "Authorization Status: Configured (via environment variable CODEAEGIS_API_KEY)"
+            );
         }
         (None, Some(key)) => {
             let masked = if key.len() > 8 {
-                format!("{}...{}", &key[..4], &key[key.len()-4..])
+                format!("{}...{}", &key[..4], &key[key.len() - 4..])
             } else {
                 "********".to_string()
             };
-            println!("Authorization Status: Configured (via OS Keychain: {})", masked);
+            println!(
+                "Authorization Status: Configured (via OS Keychain: {})",
+                masked
+            );
         }
         (None, None) => {
             println!("Authorization Status: Missing (neither CODEAEGIS_API_KEY is set nor is a key stored in OS Keychain)");
         }
     }
 
-    print!("\nWould you like to configure/update the API key for '{}' in the OS Keychain? [y/N]: ", provider);
+    print!(
+        "\nWould you like to configure/update the API key for '{}' in the OS Keychain? [y/N]: ",
+        provider
+    );
     io::stdout().flush()?;
-    
+
     let mut response = String::new();
     io::stdin().read_line(&mut response)?;
     if response.trim().to_lowercase() == "y" {

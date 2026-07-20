@@ -75,7 +75,7 @@ CodeAegis is a unified binary that supports workspace initialization, direct sca
 
 ### Subcommands:
 - `init [DIR]`: Initializes a Workspace Agent Skill (`.agent/skills/codeaegis/SKILL.md`) in the target directory (defaults to current directory).
-- `scan [DIR_OR_FILE]`: Performs a recursive security audit of a directory or specific file.
+- `scan [PATH]...`: Performs a security audit of one or more directories or files.
 - `watch [DIR]`: Monitors a directory for real-time file changes to scan them automatically. Has a `--strict` flag to automatically revert files if a vulnerability is detected.
 - `lsp`: Runs the CodeAegis Language Server (LSP) to show findings directly in your editor.
 - `auth`: Manages LLM authentication credentials in the OS keychain.
@@ -107,6 +107,9 @@ codeaegis exclude "secrets_backup.py" --scanners trufflehog
 
 # Scan a directory or specific file
 codeaegis scan ./src/main.rs --logs
+
+# Scan multiple files in one command
+codeaegis scan ./src/main.rs ./src/cli.rs
 
 # Monitor a directory and automatically revert vulnerabilities
 codeaegis watch . --strict

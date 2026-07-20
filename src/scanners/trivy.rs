@@ -1,10 +1,10 @@
-use anyhow::{Result, anyhow};
 use crate::cache::Finding;
-use tokio::process::Command;
-use std::time::Duration;
-use tokio::time::timeout;
+use anyhow::{anyhow, Result};
 use std::env;
 use std::path::PathBuf;
+use std::time::Duration;
+use tokio::process::Command;
+use tokio::time::timeout;
 use uuid::Uuid;
 
 pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
@@ -28,7 +28,7 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
 
     let temp_dir = env::temp_dir();
     let temp_file_path = temp_dir.join(format!("codeaegis-{}.{}", Uuid::new_v4(), extension));
-    
+
     tokio::fs::write(&temp_file_path, code).await?;
 
     let result = run_trivy_scan(&temp_file_path).await;
@@ -41,11 +41,17 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
 
 fn is_iac_file(path: &str) -> bool {
     let path = path.to_lowercase();
-    path.ends_with(".yml") || path.ends_with(".yaml") || path.ends_with(".json") ||
-    path.ends_with(".tf") || path.ends_with(".tf.json") || path.ends_with(".tfvars") ||
-    path.ends_with("tfplan") || path.ends_with(".tfplan") ||
-    path.ends_with(".tpl") || path.ends_with(".tar.gz") ||
-    path.ends_with(".ini")
+    path.ends_with(".yml")
+        || path.ends_with(".yaml")
+        || path.ends_with(".json")
+        || path.ends_with(".tf")
+        || path.ends_with(".tf.json")
+        || path.ends_with(".tfvars")
+        || path.ends_with("tfplan")
+        || path.ends_with(".tfplan")
+        || path.ends_with(".tpl")
+        || path.ends_with(".tar.gz")
+        || path.ends_with(".ini")
 }
 
 async fn run_trivy_scan(path: &PathBuf) -> Result<Vec<Finding>> {
@@ -87,7 +93,11 @@ fn parse_trivy_output(stdout: &[u8]) -> Result<Vec<Finding>> {
                         tool: "Trivy".to_string(),
                         severity: m["Severity"].as_str().unwrap_or("UNKNOWN").to_string(),
                         message: m["Message"].as_str().unwrap_or("No message").to_string(),
-                        location: Some(format!("{}:{}", m["ID"].as_str().unwrap_or(""), m["Title"].as_str().unwrap_or(""))),
+                        location: Some(format!(
+                            "{}:{}",
+                            m["ID"].as_str().unwrap_or(""),
+                            m["Title"].as_str().unwrap_or("")
+                        )),
                         remediation: None,
                     });
                 }

@@ -1,8 +1,8 @@
 use moka::future::Cache;
-use std::time::Duration;
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanResult {
@@ -37,7 +37,7 @@ impl ResultCache {
         let cache_file = PathBuf::from(home).join(".codeaegis-cache.json");
 
         let cache_instance = Self { cache, cache_file };
-        
+
         // Load existing cache from file
         if let Ok(data) = std::fs::read_to_string(&cache_instance.cache_file) {
             if let Ok(map) = serde_json::from_str::<HashMap<String, ScanResult>>(&data) {

@@ -1,6 +1,6 @@
 pub mod prompts;
 use crate::cache::{Finding, ScanResult};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 use std::env;
 
@@ -107,7 +107,11 @@ impl Critic {
         };
 
         if enabled {
-            tracing::info!("Using Critic Model: {} (Provider: {})", config.model, provider);
+            tracing::info!(
+                "Using Critic Model: {} (Provider: {})",
+                config.model,
+                provider
+            );
         } else {
             tracing::warn!("Critic LLM API key is missing for provider '{}'. Skipping critic validation phase (running in static-only mode).", provider);
         }
@@ -125,10 +129,16 @@ impl Critic {
         self.enabled
     }
 
-    pub async fn judge(&self, hash: String, code: &str, findings: Vec<Finding>, file_path: Option<&str>) -> Result<ScanResult> {
+    pub async fn judge(
+        &self,
+        hash: String,
+        code: &str,
+        findings: Vec<Finding>,
+        file_path: Option<&str>,
+    ) -> Result<ScanResult> {
         let provider = self.config.infer_provider();
         let file_rules = prompts::get_rules_for_file(file_path.unwrap_or("general"));
-        
+
         let system_prompt = format!(
             "{}\n{}\n{}",
             prompts::BASE_SYSTEM_PROMPT,
@@ -151,10 +161,21 @@ impl Critic {
         }
     }
 
-    async fn call_ollama(&self, system_prompt: &str, user_prompt: &str, hash: String) -> Result<ScanResult> {
-        let url = self.config.api_url.as_deref().unwrap_or("http://localhost:11434/api/generate");
-        
-        let response = self.client.post(url)
+    async fn call_ollama(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        hash: String,
+    ) -> Result<ScanResult> {
+        let url = self
+            .config
+            .api_url
+            .as_deref()
+            .unwrap_or("http://localhost:11434/api/generate");
+
+        let response = self
+            .client
+            .post(url)
             .json(&serde_json::json!({
                 "model": self.config.model,
                 "system": system_prompt,
@@ -172,16 +193,33 @@ impl Critic {
         }
 
         let res_body: serde_json::Value = response.json().await?;
-        let response_text = res_body["response"].as_str().ok_or_else(|| anyhow!("Ollama: Missing response field"))?;
-        
+        let response_text = res_body["response"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Ollama: Missing response field"))?;
+
         self.parse_judge_json(response_text, hash)
     }
 
-    async fn call_openai(&self, system_prompt: &str, user_prompt: &str, hash: String) -> Result<ScanResult> {
-        let url = self.config.api_url.as_deref().unwrap_or("https://api.openai.com/v1/chat/completions");
-        let api_key = self.config.api_key.as_ref().ok_or_else(|| anyhow!("OpenAI API key missing"))?;
+    async fn call_openai(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        hash: String,
+    ) -> Result<ScanResult> {
+        let url = self
+            .config
+            .api_url
+            .as_deref()
+            .unwrap_or("https://api.openai.com/v1/chat/completions");
+        let api_key = self
+            .config
+            .api_key
+            .as_ref()
+            .ok_or_else(|| anyhow!("OpenAI API key missing"))?;
 
-        let response = self.client.post(url)
+        let response = self
+            .client
+            .post(url)
             .header("Authorization", format!("Bearer {}", api_key))
             .json(&serde_json::json!({
                 "model": self.config.model,
@@ -201,16 +239,33 @@ impl Critic {
         }
 
         let res_body: serde_json::Value = response.json().await?;
-        let response_text = res_body["choices"][0]["message"]["content"].as_str().ok_or_else(|| anyhow!("OpenAI: Missing content field"))?;
-        
+        let response_text = res_body["choices"][0]["message"]["content"]
+            .as_str()
+            .ok_or_else(|| anyhow!("OpenAI: Missing content field"))?;
+
         self.parse_judge_json(response_text, hash)
     }
 
-    async fn call_grok(&self, system_prompt: &str, user_prompt: &str, hash: String) -> Result<ScanResult> {
-        let url = self.config.api_url.as_deref().unwrap_or("https://api.x.ai/v1/chat/completions");
-        let api_key = self.config.api_key.as_ref().ok_or_else(|| anyhow!("Grok API key missing"))?;
+    async fn call_grok(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        hash: String,
+    ) -> Result<ScanResult> {
+        let url = self
+            .config
+            .api_url
+            .as_deref()
+            .unwrap_or("https://api.x.ai/v1/chat/completions");
+        let api_key = self
+            .config
+            .api_key
+            .as_ref()
+            .ok_or_else(|| anyhow!("Grok API key missing"))?;
 
-        let response = self.client.post(url)
+        let response = self
+            .client
+            .post(url)
             .header("Authorization", format!("Bearer {}", api_key))
             .json(&serde_json::json!({
                 "model": self.config.model,
@@ -230,17 +285,37 @@ impl Critic {
         }
 
         let res_body: serde_json::Value = response.json().await?;
-        let response_text = res_body["choices"][0]["message"]["content"].as_str().ok_or_else(|| anyhow!("Grok: Missing content field"))?;
-        
+        let response_text = res_body["choices"][0]["message"]["content"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Grok: Missing content field"))?;
+
         self.parse_judge_json(response_text, hash)
     }
 
-    async fn call_gemini(&self, system_prompt: &str, user_prompt: &str, hash: String) -> Result<ScanResult> {
-        let api_key = self.config.api_key.as_ref().ok_or_else(|| anyhow!("Gemini API key missing"))?;
-        let url = self.config.api_url.as_deref().unwrap_or("https://generativelanguage.googleapis.com/v1beta/models");
-        let full_url = format!("{}/{}:generateContent?key={}", url, self.config.model, api_key);
+    async fn call_gemini(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        hash: String,
+    ) -> Result<ScanResult> {
+        let api_key = self
+            .config
+            .api_key
+            .as_ref()
+            .ok_or_else(|| anyhow!("Gemini API key missing"))?;
+        let url = self
+            .config
+            .api_url
+            .as_deref()
+            .unwrap_or("https://generativelanguage.googleapis.com/v1beta/models");
+        let full_url = format!(
+            "{}/{}:generateContent?key={}",
+            url, self.config.model, api_key
+        );
 
-        let response = self.client.post(full_url)
+        let response = self
+            .client
+            .post(full_url)
             .json(&serde_json::json!({
                 "contents": [{
                     "parts": [{
@@ -261,11 +336,11 @@ impl Critic {
         }
 
         let res_body: serde_json::Value = response.json().await?;
-        
+
         let response_text = res_body["candidates"][0]["content"]["parts"][0]["text"]
             .as_str()
             .ok_or_else(|| anyhow!("Gemini: Unexpected response structure or blocked by safety filters. Response: {}", res_body))?;
-        
+
         self.parse_judge_json(response_text, hash)
     }
 

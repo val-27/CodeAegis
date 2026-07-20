@@ -1,21 +1,21 @@
+mod auth;
 mod cache;
-mod engine;
-mod scanners;
-mod critic;
 mod cli;
 mod cli_args;
-mod auth;
-mod watchdog;
-mod lsp;
+mod critic;
+mod engine;
 mod exclusions;
+mod lsp;
+mod scanners;
+mod watchdog;
 
 use crate::cache::ResultCache;
-use crate::engine::ScanEngine;
 use crate::critic::Critic;
-use std::sync::Arc;
+use crate::engine::ScanEngine;
 use anyhow::Result;
 use clap::Parser;
-use cli_args::{Cli, Commands, AuthCommands};
+use cli_args::{AuthCommands, Cli, Commands};
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -31,7 +31,7 @@ async fn main() {
             1
         }
     };
-    
+
     std::process::exit(exit_code);
 }
 
@@ -75,7 +75,7 @@ async fn run_app() -> Result<()> {
 
     // Capacity of 1000 items, TTL of 1 hour
     let cache = Arc::new(ResultCache::new(1000, 3600));
-    
+
     let critic = match Critic::new(cli.model.clone()) {
         Ok(c) => Arc::new(c),
         Err(e) => {
@@ -83,7 +83,7 @@ async fn run_app() -> Result<()> {
             return Err(e);
         }
     };
-    
+
     let engine = Arc::new(ScanEngine::new(
         cache,
         critic,
@@ -97,7 +97,18 @@ async fn run_app() -> Result<()> {
 
     match cli.command {
         None => {
-            cli::run_directory_scan(engine, vec![std::path::PathBuf::from(".")], None, false, false, "none".to_string(), "text".to_string(), None, false).await?;
+            cli::run_directory_scan(
+                engine,
+                vec![std::path::PathBuf::from(".")],
+                None,
+                false,
+                false,
+                "none".to_string(),
+                "text".to_string(),
+                None,
+                false,
+            )
+            .await?;
         }
         Some(Commands::Watch { dir, strict }) => {
             watchdog::run_watchdog(engine, dir, strict).await?;
@@ -105,10 +116,33 @@ async fn run_app() -> Result<()> {
         Some(Commands::Lsp) => {
             lsp::run_lsp_server(engine).await?;
         }
-        Some(Commands::Scan { paths, report, recursive, no_fail, severity_threshold, format, report_format, skip_cache }) => {
-            cli::run_directory_scan(engine, paths, report, recursive, no_fail, severity_threshold, format, report_format, skip_cache).await?;
+        Some(Commands::Scan {
+            paths,
+            report,
+            recursive,
+            no_fail,
+            severity_threshold,
+            format,
+            report_format,
+            skip_cache,
+        }) => {
+            cli::run_directory_scan(
+                engine,
+                paths,
+                report,
+                recursive,
+                no_fail,
+                severity_threshold,
+                format,
+                report_format,
+                skip_cache,
+            )
+            .await?;
         }
-        Some(Commands::Auth { .. }) | Some(Commands::Init { .. }) | Some(Commands::Exclude { .. }) | Some(Commands::Setup) => unreachable!(),
+        Some(Commands::Auth { .. })
+        | Some(Commands::Init { .. })
+        | Some(Commands::Exclude { .. })
+        | Some(Commands::Setup) => unreachable!(),
     }
 
     Ok(())

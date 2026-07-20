@@ -53,7 +53,7 @@ pub enum Commands {
     },
     /// Runs the CodeAegis Language Server (LSP)
     Lsp,
-    /// Scans a directory or file for vulnerabilities
+    /// Scans directories or files for vulnerabilities
     Scan {
         /// The directories or files to scan
         #[arg(default_value = ".")]

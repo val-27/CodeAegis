@@ -58,7 +58,7 @@ fn test_cli_scan_non_recursive() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Scanning directory: example_code (recursive: false)"));
+    assert!(stdout.contains("Scanning path: example_code (recursive: false)"));
     assert!(!stdout.contains("subdir/nested.py"));
     assert!(stdout.contains("Scan Summary"));
 }
@@ -76,7 +76,7 @@ fn test_cli_scan_recursive() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Scanning directory: example_code (recursive: true)"));
+    assert!(stdout.contains("Scanning path: example_code (recursive: true)"));
     assert!(stdout.contains("subdir/nested.py"));
     assert!(stdout.contains("Scan Summary"));
 }
@@ -110,6 +110,28 @@ fn test_cli_scan_toggle_scanners() {
     assert!(output_skip.status.success());
     let stdout_skip = String::from_utf8_lossy(&output_skip.stdout);
     assert!(stdout_skip.contains("Scan Summary"));
+}
+
+#[test]
+fn test_cli_scan_multiple_paths_json() {
+    let bin_path = PathBuf::from(env!("CARGO_BIN_EXE_codeaegis"));
+
+    let output = Command::new(&bin_path)
+        .arg("--skip-scanners")
+        .arg("trufflehog,trivy,osv,opengrep")
+        .arg("scan")
+        .arg("example_code/clean.py")
+        .arg("example_code/xss.js")
+        .arg("--format")
+        .arg("json")
+        .output()
+        .expect("Failed to execute codeaegis scan with multiple paths");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\"scanned_paths\""));
+    assert!(stdout.contains("example_code/clean.py"));
+    assert!(stdout.contains("example_code/xss.js"));
 }
 
 #[test]

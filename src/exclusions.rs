@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use std::path::Path;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExclusionEntry {
@@ -34,7 +34,7 @@ pub fn save_exclusions(config: &ExclusionsConfig) -> Result<()> {
 
 pub fn handle_exclude(pattern: &str, scanners_str: &str) -> Result<()> {
     let mut config = load_exclusions()?;
-    
+
     let scanners: Vec<String> = scanners_str
         .split(',')
         .map(|s| s.trim().to_lowercase())
@@ -42,13 +42,19 @@ pub fn handle_exclude(pattern: &str, scanners_str: &str) -> Result<()> {
 
     if let Some(entry) = config.exclusions.iter_mut().find(|e| e.pattern == pattern) {
         entry.scanners = scanners.clone();
-        println!("🔄 Updated exclusion pattern '{}' with scanners: {:?}", pattern, scanners);
+        println!(
+            "🔄 Updated exclusion pattern '{}' with scanners: {:?}",
+            pattern, scanners
+        );
     } else {
         config.exclusions.push(ExclusionEntry {
             pattern: pattern.to_string(),
             scanners: scanners.clone(),
         });
-        println!("➕ Added exclusion pattern '{}' with scanners: {:?}", pattern, scanners);
+        println!(
+            "➕ Added exclusion pattern '{}' with scanners: {:?}",
+            pattern, scanners
+        );
     }
 
     save_exclusions(&config)?;
@@ -58,23 +64,24 @@ pub fn handle_exclude(pattern: &str, scanners_str: &str) -> Result<()> {
 pub fn is_pattern_match(path_str: &str, pattern: &str) -> bool {
     let path_str = path_str.replace('\\', "/");
     let pattern = pattern.replace('\\', "/");
-    
-    if pattern.starts_with("**/") {
-        let suffix = &pattern[3..];
-        return path_str.ends_with(suffix) || path_str.contains(&format!("/{}/", suffix)) || path_str.contains(&format!("/{}", suffix));
+
+    if let Some(suffix) = pattern.strip_prefix("**/") {
+        return path_str.ends_with(suffix)
+            || path_str.contains(&format!("/{}/", suffix))
+            || path_str.contains(&format!("/{}", suffix));
     }
-    
+
     if pattern.ends_with("/**") {
         let prefix = &pattern[..pattern.len() - 3];
         return path_str.starts_with(prefix);
     }
-    
+
     if pattern.contains('*') {
         let parts: Vec<&str> = pattern.split('*').collect();
         if parts.len() == 2 {
             return path_str.starts_with(parts[0]) && path_str.ends_with(parts[1]);
         }
     }
-    
+
     path_str == pattern || path_str.contains(&format!("/{}", pattern))
 }

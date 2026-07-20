@@ -1,5 +1,5 @@
-use anyhow::{Result, anyhow};
 use crate::cache::Finding;
+use anyhow::{anyhow, Result};
 use serde_json::json;
 use std::time::Duration;
 
@@ -12,18 +12,19 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
     // Parse dependencies
     let mut queries = Vec::new();
     let mut dep_info = Vec::new();
-    
+
     for line in code.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        
+
         let clean_line = if let Some(idx) = line.find(';') {
             &line[..idx]
         } else {
             line
-        }.trim();
+        }
+        .trim();
 
         if let Some(idx) = clean_line.find("==") {
             let name = clean_line[..idx].trim().to_string();
@@ -50,17 +51,23 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
         .build()?;
     let payload = json!({ "queries": queries });
 
-    let response = client.post("https://api.osv.dev/v1/querybatch")
+    let response = client
+        .post("https://api.osv.dev/v1/querybatch")
         .json(&payload)
         .send()
         .await?;
 
     if !response.status().is_success() {
-        return Err(anyhow!("OSV API querybatch failed with status: {}", response.status()));
+        return Err(anyhow!(
+            "OSV API querybatch failed with status: {}",
+            response.status()
+        ));
     }
 
     let body: serde_json::Value = response.json().await?;
-    let results = body["results"].as_array().ok_or_else(|| anyhow!("Invalid OSV API response structure"))?;
+    let results = body["results"]
+        .as_array()
+        .ok_or_else(|| anyhow!("Invalid OSV API response structure"))?;
 
     let mut findings = Vec::new();
     let mut detail_futures = Vec::new();
@@ -75,7 +82,7 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
                         let dep_name = dep_name.clone();
                         let dep_version = dep_version.clone();
                         let client_clone = client.clone();
-                        
+
                         detail_futures.push(tokio::spawn(async move {
                             let fallback = fallback_finding(&id, &dep_name, &dep_version);
                             fetch_vuln_details(&client_clone, id, dep_name, dep_version)
@@ -97,7 +104,12 @@ pub async fn scan(code: &str, file_path: Option<&str>) -> Result<Vec<Finding>> {
     Ok(findings)
 }
 
-async fn fetch_vuln_details(client: &reqwest::Client, id: String, dep_name: String, dep_version: String) -> Result<Finding> {
+async fn fetch_vuln_details(
+    client: &reqwest::Client,
+    id: String,
+    dep_name: String,
+    dep_version: String,
+) -> Result<Finding> {
     let url = format!("https://api.osv.dev/v1/vulns/{}", id);
     let response = client.get(&url).send().await?;
     if !response.status().is_success() {
@@ -108,12 +120,25 @@ async fn fetch_vuln_details(client: &reqwest::Client, id: String, dep_name: Stri
     let summary = val["summary"].as_str().unwrap_or("");
     let details = val["details"].as_str().unwrap_or("");
     let message = if !summary.is_empty() {
-        format!("Vulnerability {} in {}=={}: {}", id, dep_name, dep_version, summary)
+        format!(
+            "Vulnerability {} in {}=={}: {}",
+            id, dep_name, dep_version, summary
+        )
     } else if !details.is_empty() {
-        let truncated_details = if details.len() > 100 { &details[..100] } else { details };
-        format!("Vulnerability {} in {}=={}: {}", id, dep_name, dep_version, truncated_details)
+        let truncated_details = if details.len() > 100 {
+            &details[..100]
+        } else {
+            details
+        };
+        format!(
+            "Vulnerability {} in {}=={}: {}",
+            id, dep_name, dep_version, truncated_details
+        )
     } else {
-        format!("Vulnerability {} found in package {}=={}", id, dep_name, dep_version)
+        format!(
+            "Vulnerability {} found in package {}=={}",
+            id, dep_name, dep_version
+        )
     };
 
     let mut severity = "HIGH".to_string();
@@ -137,7 +162,8 @@ async fn fetch_vuln_details(client: &reqwest::Client, id: String, dep_name: Stri
                     if let Some(events) = r["events"].as_array() {
                         for ev in events {
                             if let Some(fixed) = ev["fixed"].as_str() {
-                                remediation = Some(format!("Upgrade {} to v{} or higher", dep_name, fixed));
+                                remediation =
+                                    Some(format!("Upgrade {} to v{} or higher", dep_name, fixed));
                             }
                         }
                     }
@@ -159,7 +185,10 @@ fn fallback_finding(id: &str, dep_name: &str, dep_version: &str) -> Finding {
     Finding {
         tool: "OSV".to_string(),
         severity: "HIGH".to_string(),
-        message: format!("Vulnerability {} found in package {}=={}", id, dep_name, dep_version),
+        message: format!(
+            "Vulnerability {} found in package {}=={}",
+            id, dep_name, dep_version
+        ),
         location: Some(format!("requirements.txt:{}", dep_name)),
         remediation: None,
     }

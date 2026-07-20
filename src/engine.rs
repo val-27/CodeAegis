@@ -1,10 +1,10 @@
-use crate::cache::{ResultCache, ScanResult, Finding};
+use crate::cache::{Finding, ResultCache, ScanResult};
 use crate::critic::Critic;
+use anyhow::Result;
 use dashmap::DashMap;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use anyhow::Result;
 
 pub struct ScanEngine {
     cache: Arc<ResultCache>,
@@ -33,10 +33,16 @@ impl ScanEngine {
     }
 
     pub fn set_logging(&self, enabled: bool) {
-        self.enable_logs.store(enabled, std::sync::atomic::Ordering::Relaxed);
+        self.enable_logs
+            .store(enabled, std::sync::atomic::Ordering::Relaxed);
     }
 
-    pub async fn scan(&self, code: &str, file_path: Option<&str>, skip_cache: bool) -> Result<ScanResult> {
+    pub async fn scan(
+        &self,
+        code: &str,
+        file_path: Option<&str>,
+        skip_cache: bool,
+    ) -> Result<ScanResult> {
         let hash = self.compute_hash(code);
 
         // 0. Exclusions Check
@@ -46,7 +52,7 @@ impl ScanEngine {
             if let Ok(config) = crate::exclusions::load_exclusions() {
                 for excl in &config.exclusions {
                     if crate::exclusions::is_pattern_match(path, &excl.pattern) {
-                        if excl.scanners.iter().any(|s| s == "all" || s == "all") {
+                        if excl.scanners.iter().any(|s| s == "all") {
                             skip_all = true;
                             break;
                         } else {
@@ -89,8 +95,10 @@ impl ScanEngine {
 
         if let Some(tx) = tx {
             // I am the Lead Task
-            let result = self.execute_scans(hash.clone(), code, file_path, file_skips).await?;
-            
+            let result = self
+                .execute_scans(hash.clone(), code, file_path, file_skips)
+                .await?;
+
             // 3. Cache the result
             self.cache.insert(hash.clone(), result.clone()).await;
 
@@ -122,39 +130,74 @@ impl ScanEngine {
         file_path: Option<&str>,
         file_skips: Vec<String>,
     ) -> Result<ScanResult> {
-        use crate::scanners::{trufflehog, osv, trivy, opengrep};
+        use crate::scanners::{opengrep, osv, trivy, trufflehog};
 
-        let run_truffle = self.is_scanner_enabled("trufflehog") && !file_skips.contains(&"trufflehog".to_string());
+        let run_truffle = self.is_scanner_enabled("trufflehog")
+            && !file_skips.contains(&"trufflehog".to_string());
         let run_osv = self.is_scanner_enabled("osv") && !file_skips.contains(&"osv".to_string());
-        let run_trivy = self.is_scanner_enabled("trivy") && !file_skips.contains(&"trivy".to_string());
-        let run_opengrep = self.is_scanner_enabled("opengrep") && !file_skips.contains(&"opengrep".to_string());
+        let run_trivy =
+            self.is_scanner_enabled("trivy") && !file_skips.contains(&"trivy".to_string());
+        let run_opengrep =
+            self.is_scanner_enabled("opengrep") && !file_skips.contains(&"opengrep".to_string());
 
         // Run scanners in parallel
         let (truffle_res, osv_res, trivy_res, opengrep_res) = tokio::join!(
-            async { if run_truffle { trufflehog::scan(code, file_path).await } else { Ok(vec![]) } },
-            async { if run_osv { osv::scan(code, file_path).await } else { Ok(vec![]) } },
-            async { if run_trivy { trivy::scan(code, file_path).await } else { Ok(vec![]) } },
-            async { if run_opengrep { opengrep::scan(code, file_path).await } else { Ok(vec![]) } }
+            async {
+                if run_truffle {
+                    trufflehog::scan(code, file_path).await
+                } else {
+                    Ok(vec![])
+                }
+            },
+            async {
+                if run_osv {
+                    osv::scan(code, file_path).await
+                } else {
+                    Ok(vec![])
+                }
+            },
+            async {
+                if run_trivy {
+                    trivy::scan(code, file_path).await
+                } else {
+                    Ok(vec![])
+                }
+            },
+            async {
+                if run_opengrep {
+                    opengrep::scan(code, file_path).await
+                } else {
+                    Ok(vec![])
+                }
+            }
         );
 
         let mut all_findings = Vec::new();
         let mut active_scanners = Vec::new();
-        
-        if let Ok(findings) = truffle_res { 
-            if !findings.is_empty() { active_scanners.push("TruffleHog"); }
-            all_findings.extend(findings); 
+
+        if let Ok(findings) = truffle_res {
+            if !findings.is_empty() {
+                active_scanners.push("TruffleHog");
+            }
+            all_findings.extend(findings);
         }
-        if let Ok(findings) = osv_res { 
-            if !findings.is_empty() { active_scanners.push("OSV"); }
-            all_findings.extend(findings); 
+        if let Ok(findings) = osv_res {
+            if !findings.is_empty() {
+                active_scanners.push("OSV");
+            }
+            all_findings.extend(findings);
         }
-        if let Ok(findings) = trivy_res { 
-            if !findings.is_empty() { active_scanners.push("Trivy"); }
-            all_findings.extend(findings); 
+        if let Ok(findings) = trivy_res {
+            if !findings.is_empty() {
+                active_scanners.push("Trivy");
+            }
+            all_findings.extend(findings);
         }
-        if let Ok(findings) = opengrep_res { 
-            if !findings.is_empty() { active_scanners.push("Opengrep"); }
-            all_findings.extend(findings); 
+        if let Ok(findings) = opengrep_res {
+            if !findings.is_empty() {
+                active_scanners.push("Opengrep");
+            }
+            all_findings.extend(findings);
         }
 
         // Apply inline suppression filter
@@ -176,11 +219,25 @@ impl ScanEngine {
                 if f.remediation.is_none() {
                     let tool = f.tool.to_lowercase();
                     let msg = f.message.to_lowercase();
-                    let suggestion = if tool.contains("trufflehog") || msg.contains("secret") || msg.contains("key") || msg.contains("password") || msg.contains("token") {
+                    let suggestion = if tool.contains("trufflehog")
+                        || msg.contains("secret")
+                        || msg.contains("key")
+                        || msg.contains("password")
+                        || msg.contains("token")
+                    {
                         "Do not commit plain-text credentials. Use environment variables (e.g. process.env, std::env) loaded via a gitignored file (.env) or retrieve secrets from a secure cloud secrets manager (e.g., AWS Secrets Manager, HashiCorp Vault)."
-                    } else if tool.contains("trivy") || tool.contains("osv") || msg.contains("vulnerab") || msg.contains("cve") {
+                    } else if tool.contains("trivy")
+                        || tool.contains("osv")
+                        || msg.contains("vulnerab")
+                        || msg.contains("cve")
+                    {
                         "Upgrade this package dependency version to its latest non-vulnerable release. Run package manager security upgrades (e.g., npm audit fix, cargo update)."
-                    } else if tool.contains("opengrep") || msg.contains("injection") || msg.contains("eval") || msg.contains("exec") || msg.contains("xss") {
+                    } else if tool.contains("opengrep")
+                        || msg.contains("injection")
+                        || msg.contains("eval")
+                        || msg.contains("exec")
+                        || msg.contains("xss")
+                    {
                         "Avoid unvalidated user input inside execution sinks. Use parameterized SQL queries, context-aware HTML encoding/escaping libraries, and avoid direct OS shell spawners if safer native language APIs are available."
                     } else {
                         "Analyze the source code at this location to ensure proper input validation, secure defaults, and robust credential storage configurations."
@@ -201,7 +258,11 @@ impl ScanEngine {
             };
 
             if self.enable_logs.load(std::sync::atomic::Ordering::Relaxed) {
-                let scanners_list = if active_scanners.is_empty() { "None".to_string() } else { active_scanners.join(", ") };
+                let scanners_list = if active_scanners.is_empty() {
+                    "None".to_string()
+                } else {
+                    active_scanners.join(", ")
+                };
                 tracing::warn!(
                     "🔍 Scan Result (Static Only): Scanners[{}] | Risk[{}] | Summary: {}",
                     scanners_list,
@@ -213,10 +274,17 @@ impl ScanEngine {
         }
 
         // Agentic CRITIC Check
-        let final_result = self.critic.judge(hash, code, all_findings, file_path).await?;
+        let final_result = self
+            .critic
+            .judge(hash, code, all_findings, file_path)
+            .await?;
 
         if self.enable_logs.load(std::sync::atomic::Ordering::Relaxed) {
-            let scanners_list = if active_scanners.is_empty() { "None".to_string() } else { active_scanners.join(", ") };
+            let scanners_list = if active_scanners.is_empty() {
+                "None".to_string()
+            } else {
+                active_scanners.join(", ")
+            };
             tracing::warn!(
                 "🔍 Scan Result: Scanners[{}] | Critic[{}] | Summary: {}",
                 scanners_list,
@@ -230,17 +298,17 @@ impl ScanEngine {
 
     fn is_scanner_enabled(&self, name: &str) -> bool {
         let name_lower = name.to_lowercase();
-        
+
         if let Some(disabled) = &self.disabled_scanners {
             if disabled.iter().any(|s| s.to_lowercase() == name_lower) {
                 return false;
             }
         }
-        
+
         if let Some(enabled) = &self.enabled_scanners {
             return enabled.iter().any(|s| s.to_lowercase() == name_lower);
         }
-        
+
         true
     }
 }
@@ -257,7 +325,7 @@ fn determine_raw_risk_tier(findings: &[Finding]) -> String {
             _ => {}
         }
     }
-    
+
     match highest {
         "High" => "High".to_string(),
         "Medium" => "Medium".to_string(),
@@ -272,18 +340,18 @@ fn filter_ignored_findings(code: &str, findings: Vec<Finding>) -> Vec<Finding> {
 
     for f in findings {
         let mut ignored = false;
-        
+
         if let Some(loc) = &f.location {
-            if let Some(last_part) = loc.split(':').last() {
+            if let Some(last_part) = loc.split(':').next_back() {
                 if let Ok(line_num) = last_part.trim().parse::<usize>() {
                     if line_num > 0 && line_num <= lines.len() {
                         let current_line = lines[line_num - 1];
-                        
+
                         // Check same-line ignore
                         if current_line.contains("codeaegis:ignore") {
                             ignored = true;
                         }
-                        
+
                         // Check ignore-next-line on preceding line
                         if line_num > 1 {
                             let prev_line = lines[line_num - 2];
@@ -295,7 +363,7 @@ fn filter_ignored_findings(code: &str, findings: Vec<Finding>) -> Vec<Finding> {
                 }
             }
         }
-        
+
         if !ignored {
             filtered.push(f);
         }

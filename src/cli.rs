@@ -1,11 +1,12 @@
-use crate::engine::ScanEngine;
 use crate::cache::ScanResult;
-use anyhow::{Result, Context};
+use crate::engine::ScanEngine;
+use anyhow::{Context, Result};
 use ignore::WalkBuilder;
+use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use serde_json::json;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_directory_scan(
     engine: Arc<ScanEngine>,
     paths: Vec<PathBuf>,
@@ -18,10 +19,14 @@ pub async fn run_directory_scan(
     skip_cache: bool,
 ) -> Result<()> {
     let is_json = format == "json";
-    
+
     if !is_json {
         if paths.len() == 1 {
-            println!("Scanning path: {} (recursive: {})", paths[0].display(), recursive);
+            println!(
+                "Scanning path: {} (recursive: {})",
+                paths[0].display(),
+                recursive
+            );
         } else {
             println!("Scanning {} paths (recursive: {})", paths.len(), recursive);
         }
@@ -61,7 +66,7 @@ pub async fn run_directory_scan(
         let entry = result?;
         if entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
             let path = entry.path();
-            
+
             // Skip binary files and those that are too large (> 1MB)
             if is_binary(path) || entry.metadata()?.len() > 1024 * 1024 {
                 continue;
@@ -73,7 +78,7 @@ pub async fn run_directory_scan(
             };
 
             let rel_path = path.strip_prefix(".").unwrap_or(path).to_string_lossy();
-            
+
             if !is_json {
                 print!("  Scanning {}... ", rel_path);
             }
@@ -86,7 +91,9 @@ pub async fn run_directory_scan(
                             println!("{}", format_risk_tier(&scan_res.risk_tier));
                         }
                     }
-                    if scan_res.summary != "Skipped (Excluded by configuration)" && scan_res.risk_tier != "None" {
+                    if scan_res.summary != "Skipped (Excluded by configuration)"
+                        && scan_res.risk_tier != "None"
+                    {
                         results.push((rel_path.to_string(), scan_res));
                     }
                 }
@@ -136,7 +143,8 @@ fn is_binary(path: &Path) -> bool {
     // Expanded list of non-code extensions to skip
     if let Some(ext) = path.extension() {
         let ext = ext.to_string_lossy().to_lowercase();
-        return matches!(ext.as_str(), 
+        return matches!(
+            ext.as_str(),
             "bin" | "exe" | "obj" | "o" | "so" | "dll" | "dylib" | // Binaries
             "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" | "svg" | "mp4" | "mov" | "mp3" | "wav" | // Media
             "pdf" | "zip" | "gz" | "tar" | "7z" | "rar" | // Archives
@@ -144,7 +152,7 @@ fn is_binary(path: &Path) -> bool {
             "woff" | "woff2" | "ttf" | "eot" // Fonts
         );
     }
-    
+
     // Check for common noisy filenames without extensions
     if let Some(name) = path.file_name() {
         let name = name.to_string_lossy().to_lowercase();
@@ -176,24 +184,37 @@ fn format_severity(sev: &str) -> String {
 }
 
 fn print_code_snippet(file_path: &str, line_num: usize) {
-    if line_num == 0 { return; }
+    if line_num == 0 {
+        return;
+    }
     if let Ok(content) = std::fs::read_to_string(file_path) {
         let lines: Vec<&str> = content.lines().collect();
         if line_num <= lines.len() {
             let line = lines[line_num - 1];
             // Context line before
             if line_num > 1 {
-                println!("    \x1b[90m{:>4} | {}\x1b[0m", line_num - 1, lines[line_num - 2]);
+                println!(
+                    "    \x1b[90m{:>4} | {}\x1b[0m",
+                    line_num - 1,
+                    lines[line_num - 2]
+                );
             }
             // The offending line
             println!("    \x1b[1;31m{:>4} | {}\x1b[0m", line_num, line);
             // Red indicator pointer
             let lead_spaces = line.chars().take_while(|c| c.is_whitespace()).count();
             let pointer_indent = " ".repeat(9 + lead_spaces);
-            println!("{}\x1b[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^\x1b[0m", pointer_indent);
+            println!(
+                "{}\x1b[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^\x1b[0m",
+                pointer_indent
+            );
             // Context line after
             if line_num < lines.len() {
-                println!("    \x1b[90m{:>4} | {}\x1b[0m", line_num + 1, lines[line_num]);
+                println!(
+                    "    \x1b[90m{:>4} | {}\x1b[0m",
+                    line_num + 1,
+                    lines[line_num]
+                );
             }
         }
     }
@@ -238,14 +259,17 @@ fn print_summary(results: &[(String, ScanResult)]) {
         println!("\n📂 \x1b[1mFile:\x1b[0m \x1b[4m{}\x1b[0m", path);
         println!("⚠️  \x1b[1mRisk Tier:\x1b[0m {}", risk_badge);
         println!("ℹ️  \x1b[1mCritic Summary:\x1b[0m {}", res.summary);
-        
+
         println!("\n\x1b[1mFindings:\x1b[0m");
         for finding in &res.findings {
             let sev_badge = format_severity(&finding.severity);
-            println!("  • \x1b[1m[{}]\x1b[0m ({}): {}", finding.tool, sev_badge, finding.message);
-            
+            println!(
+                "  • \x1b[1m[{}]\x1b[0m ({}): {}",
+                finding.tool, sev_badge, finding.message
+            );
+
             if let Some(loc) = &finding.location {
-                if let Some(last_part) = loc.split(':').last() {
+                if let Some(last_part) = loc.split(':').next_back() {
                     if let Ok(line_num) = last_part.trim().parse::<usize>() {
                         print_code_snippet(path, line_num);
                     }
@@ -333,17 +357,23 @@ fn generate_junit(results: &[(String, ScanResult)], path: &Path) -> Result<()> {
     let mut xml = String::new();
     xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     xml.push_str("<testsuites name=\"CodeAegis Security Scan\">\n");
-    
+
     let total_tests = results.len();
-    let total_failures = results.iter().filter(|(_, res)| res.risk_tier != "None" && !res.findings.is_empty()).count();
-    
+    let total_failures = results
+        .iter()
+        .filter(|(_, res)| res.risk_tier != "None" && !res.findings.is_empty())
+        .count();
+
     xml.push_str(&format!(
         "  <testsuite name=\"Static Security Analysis\" tests=\"{}\" failures=\"{}\" errors=\"0\">\n",
         total_tests, total_failures
     ));
-    
+
     for (file_path, res) in results {
-        let safe_file = file_path.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+        let safe_file = file_path
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;");
         if res.findings.is_empty() {
             xml.push_str(&format!(
                 "    <testcase name=\"{}\" classname=\"CodeAegis.Security\"/>\n",
@@ -355,9 +385,19 @@ fn generate_junit(results: &[(String, ScanResult)], path: &Path) -> Result<()> {
                 safe_file
             ));
             for f in &res.findings {
-                let safe_msg = f.message.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
-                let rem_str = f.remediation.as_deref().unwrap_or("No remediation hint available.");
-                let safe_rem = rem_str.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+                let safe_msg = f
+                    .message
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;");
+                let rem_str = f
+                    .remediation
+                    .as_deref()
+                    .unwrap_or("No remediation hint available.");
+                let safe_rem = rem_str
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;");
                 xml.push_str(&format!(
                     "      <failure message=\"[{}] {}\">\n",
                     f.severity, safe_msg
@@ -371,10 +411,10 @@ fn generate_junit(results: &[(String, ScanResult)], path: &Path) -> Result<()> {
             xml.push_str("    </testcase>\n");
         }
     }
-    
+
     xml.push_str("  </testsuite>\n");
     xml.push_str("</testsuites>\n");
-    
+
     std::fs::write(path, xml)?;
     println!("JUnit XML report written to: {}", path.display());
     Ok(())
@@ -389,16 +429,21 @@ fn generate_markdown(results: &[(String, ScanResult)], path: &Path) -> Result<()
     for (file_path, res) in results {
         md.push_str(&format!(
             "| `{}` | **{}** | {} | {} |\n",
-            file_path, res.risk_tier, res.findings.len(), res.summary
+            file_path,
+            res.risk_tier,
+            res.findings.len(),
+            res.summary
         ));
     }
-    
+
     md.push_str("\n## Detailed Findings\n\n");
     if results.iter().all(|(_, res)| res.findings.is_empty()) {
         md.push_str("🟢 No vulnerabilities detected in this scan.\n");
     } else {
         for (file_path, res) in results {
-            if res.findings.is_empty() { continue; }
+            if res.findings.is_empty() {
+                continue;
+            }
             md.push_str(&format!("### 📂 `{}`\n", file_path));
             md.push_str(&format!("**Risk Level:** {}\n\n", res.risk_tier));
             for f in &res.findings {
@@ -410,11 +455,11 @@ fn generate_markdown(results: &[(String, ScanResult)], path: &Path) -> Result<()
                 if let Some(rem) = &f.remediation {
                     md.push_str(&format!("    *   **Remediation:** {}\n", rem));
                 }
-                md.push_str("\n");
+                md.push('\n');
             }
         }
     }
-    
+
     std::fs::write(path, md)?;
     println!("Markdown report written to: {}", path.display());
     Ok(())
@@ -541,10 +586,12 @@ fn generate_html(results: &[(String, ScanResult)], path: &Path) -> Result<()> {
         <div class="summary-card">
             <strong>Scan Summary:</strong> Total files scanned: "#);
     html.push_str(&format!("{}", results.len()));
-    html.push_str(r#".
+    html.push_str(
+        r#".
         </div>
-    "#);
-    
+    "#,
+    );
+
     for (file_path, res) in results {
         let badge_class = res.risk_tier.to_lowercase();
         html.push_str(&format!(
@@ -558,13 +605,18 @@ fn generate_html(results: &[(String, ScanResult)], path: &Path) -> Result<()> {
             "#,
             file_path, badge_class, res.risk_tier, res.summary
         ));
-        
+
         if res.findings.is_empty() {
-            html.push_str("<p style=\"color: #1a7f37;\">🟢 No vulnerabilities found in this file.</p>");
+            html.push_str(
+                "<p style=\"color: #1a7f37;\">🟢 No vulnerabilities found in this file.</p>",
+            );
         } else {
             for f in &res.findings {
                 let f_class = f.severity.to_lowercase();
-                let rem_str = f.remediation.as_deref().unwrap_or("No remediation hint available.");
+                let rem_str = f
+                    .remediation
+                    .as_deref()
+                    .unwrap_or("No remediation hint available.");
                 html.push_str(&format!(
                     r#"<div class="finding-item {}">
                         <strong>[{}] {}</strong> (Severity: {})<br>
@@ -575,18 +627,23 @@ fn generate_html(results: &[(String, ScanResult)], path: &Path) -> Result<()> {
                 ));
             }
         }
-        
+
         html.push_str("</div></div>");
     }
-    
+
     html.push_str("</div></body></html>");
     std::fs::write(path, html)?;
     println!("HTML report written to: {}", path.display());
     Ok(())
 }
 
-pub fn generate_report(results: &[(String, ScanResult)], path: &Path, format_opt: Option<&str>) -> Result<()> {
-    let extension = path.extension()
+pub fn generate_report(
+    results: &[(String, ScanResult)],
+    path: &Path,
+    format_opt: Option<&str>,
+) -> Result<()> {
+    let extension = path
+        .extension()
         .and_then(|ext| ext.to_str())
         .map(|ext| ext.to_lowercase());
 
@@ -618,11 +675,13 @@ pub fn generate_report(results: &[(String, ScanResult)], path: &Path, format_opt
 
 pub fn handle_init(dir: &Path, no_hooks: bool) -> Result<()> {
     let skill_dir = dir.join(".agent/skills/codeaegis");
-    std::fs::create_dir_all(&skill_dir)
-        .context(format!("Failed to create skill directory: {}", skill_dir.display()))?;
+    std::fs::create_dir_all(&skill_dir).context(format!(
+        "Failed to create skill directory: {}",
+        skill_dir.display()
+    ))?;
 
     let skill_file_path = skill_dir.join("SKILL.md");
-    
+
     let skill_content = r#"---
 name: codeaegis
 description: Protects the codebase by running real-time security verification on code changes. Use this skill whenever you write or modify code to verify there are no secrets, vulnerable dependencies, or insecure configurations.
@@ -675,15 +734,22 @@ codeaegis scan . --skip-cache
   3. Re-run `codeaegis scan` to confirm the code is clean before presenting it to the user.
 "#;
 
-    std::fs::write(&skill_file_path, skill_content)
-        .context(format!("Failed to write SKILL.md to {}", skill_file_path.display()))?;
+    std::fs::write(&skill_file_path, skill_content).context(format!(
+        "Failed to write SKILL.md to {}",
+        skill_file_path.display()
+    ))?;
 
-    println!("Initialized Workspace Agent Skill for CodeAegis at: {}", skill_file_path.display());
+    println!(
+        "Initialized Workspace Agent Skill for CodeAegis at: {}",
+        skill_file_path.display()
+    );
 
     // Create rules directory and security.md file
     let rules_dir = dir.join(".agent/rules");
-    std::fs::create_dir_all(&rules_dir)
-        .context(format!("Failed to create rules directory: {}", rules_dir.display()))?;
+    std::fs::create_dir_all(&rules_dir).context(format!(
+        "Failed to create rules directory: {}",
+        rules_dir.display()
+    ))?;
 
     let security_file_path = rules_dir.join("security.md");
     let security_content = r#"# CodeAegis Security Verification Rule
@@ -697,18 +763,25 @@ This repository uses **CodeAegis** to ensure code changes are secure, free of se
 4. You can find detailed usage and CLI options in the Workspace Agent Skill definition at `.agent/skills/codeaegis/SKILL.md`.
 "#;
 
-    std::fs::write(&security_file_path, security_content)
-        .context(format!("Failed to write security.md to {}", security_file_path.display()))?;
+    std::fs::write(&security_file_path, security_content).context(format!(
+        "Failed to write security.md to {}",
+        security_file_path.display()
+    ))?;
 
-    println!("Initialized Agent Security Rule at: {}", security_file_path.display());
+    println!(
+        "Initialized Agent Security Rule at: {}",
+        security_file_path.display()
+    );
 
     if !no_hooks {
         if let Some(hooks_dir) = get_hooks_dir(dir) {
             if !hooks_dir.exists() {
-                std::fs::create_dir_all(&hooks_dir)
-                    .context(format!("Failed to create git hooks directory: {}", hooks_dir.display()))?;
+                std::fs::create_dir_all(&hooks_dir).context(format!(
+                    "Failed to create git hooks directory: {}",
+                    hooks_dir.display()
+                ))?;
             }
-            
+
             let hook_path = hooks_dir.join("pre-commit");
             let hook_content = r#"#!/bin/sh
 # CodeAegis Pre-Commit Security Guard
@@ -740,16 +813,20 @@ fi
 exit 0
 "#;
 
-            std::fs::write(&hook_path, hook_content)
-                .context(format!("Failed to write pre-commit hook to {}", hook_path.display()))?;
+            std::fs::write(&hook_path, hook_content).context(format!(
+                "Failed to write pre-commit hook to {}",
+                hook_path.display()
+            ))?;
 
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 let mut perms = std::fs::metadata(&hook_path)?.permissions();
                 perms.set_mode(0o755);
-                std::fs::set_permissions(&hook_path, perms)
-                    .context(format!("Failed to set executable permissions on {}", hook_path.display()))?;
+                std::fs::set_permissions(&hook_path, perms).context(format!(
+                    "Failed to set executable permissions on {}",
+                    hook_path.display()
+                ))?;
             }
 
             println!("Git pre-commit hook installed at: {}", hook_path.display());
@@ -763,16 +840,21 @@ exit 0
 
 pub fn handle_setup() -> Result<()> {
     use std::io::{self, Write};
-    
+
     println!("\n\x1b[1;36m==================================================\x1b[0m");
     println!("\x1b[1;36m🚀 CodeAegis Interactive Setup Wizard\x1b[0m");
     println!("\x1b[1;36m==================================================\x1b[0m");
-    println!("This wizard will help you set up credentials, exclusion rules, and workspace skills.\n");
+    println!(
+        "This wizard will help you set up credentials, exclusion rules, and workspace skills.\n"
+    );
 
     // 1. LLM Credentials Setup
     let providers = vec!["gemini", "openai", "grok"];
     for provider in providers {
-        print!("🔑 Would you like to configure the API key for '{}'? [y/N]: ", provider);
+        print!(
+            "🔑 Would you like to configure the API key for '{}'? [y/N]: ",
+            provider
+        );
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
@@ -828,15 +910,18 @@ pub fn handle_setup() -> Result<()> {
 pub fn install_binaries() -> Result<()> {
     use std::io::Write;
     use std::process::{Command, Stdio};
-    
+
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let bin_dir = std::path::PathBuf::from(&home).join(".cargo/bin");
-    
+
     if !bin_dir.exists() {
         std::fs::create_dir_all(&bin_dir)?;
     }
 
-    println!("\n📥 Installing external security scanners to {}...", bin_dir.display());
+    println!(
+        "\n📥 Installing external security scanners to {}...",
+        bin_dir.display()
+    );
 
     let run_installer = |url: &str| -> Result<bool> {
         let mut curl = Command::new("curl")
@@ -864,7 +949,9 @@ pub fn install_binaries() -> Result<()> {
     // 1. Install TruffleHog
     print!("  Installing TruffleHog... ");
     std::io::stdout().flush()?;
-    match run_installer("https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh") {
+    match run_installer(
+        "https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh",
+    ) {
         Ok(true) => println!("✅ Done"),
         _ => println!("❌ Failed (skipping)"),
     }
@@ -872,7 +959,9 @@ pub fn install_binaries() -> Result<()> {
     // 2. Install Trivy
     print!("  Installing Trivy... ");
     std::io::stdout().flush()?;
-    match run_installer("https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh") {
+    match run_installer(
+        "https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh",
+    ) {
         Ok(true) => println!("✅ Done"),
         _ => println!("❌ Failed (skipping)"),
     }
@@ -921,13 +1010,13 @@ fn get_hooks_dir(dir: &Path) -> Option<PathBuf> {
         } else if git_path.is_file() {
             if let Ok(content) = std::fs::read_to_string(&git_path) {
                 if let Some(line) = content.lines().next() {
-                    if line.starts_with("gitdir:") {
-                        let gitdir_path = line["gitdir:".len()..].trim();
+                    if let Some(gitdir_path) = line.strip_prefix("gitdir:") {
+                        let gitdir_path = gitdir_path.trim();
                         let mut gitdir = PathBuf::from(gitdir_path);
                         if !gitdir.is_absolute() {
                             gitdir = dir.join(gitdir);
                         }
-                        
+
                         if gitdir_path.contains("worktrees") {
                             return None;
                         } else {
